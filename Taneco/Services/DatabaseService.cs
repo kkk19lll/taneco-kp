@@ -13,7 +13,7 @@ public class DatabaseService
 
     public DatabaseService()
     {
-        _connectionString = "Host=localhost;Port=5432;Database=Taneco 2;Username=postgres;Password=123;";
+        _connectionString = "Host=localhost;Port=5432;Database=kp;Username=postgres;Password=123;";
     }
 
     private async Task<NpgsqlConnection> GetConnectionAsync()
