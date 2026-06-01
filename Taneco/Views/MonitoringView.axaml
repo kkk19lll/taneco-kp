@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Taneco.ViewModels"
+             x:Class="Taneco.Views.MonitoringView"
+             x:DataType="vm:MonitoringViewModel">
+    <ScrollViewer>
+        <StackPanel Margin="15">
+            <Border Classes="card" Margin="0,0,0,15">
+                <StackPanel>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                    <ProgressBar IsIndeterminate="{Binding IsLoading}" Height="3" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card" Margin="0,0,0,15" IsVisible="{Binding CanSelectDate}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                    <TextBlock Text="Выберите дату:" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <ComboBox ItemsSource="{Binding AvailableDates}"
+                              SelectedItem="{Binding SelectedDate}"
+                              Width="150">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding StringFormat=dd.MM.yyyy}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsLoading}">Обновить</Button>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Показания датчиков" Classes="h2" Margin="0,0,0,10"/>
+            
+            <ItemsControl ItemsSource="{Binding Measurements}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Classes="card" Margin="0,0,0,5">
+                            <Button Command="{Binding DataContext.MeasurementClickCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent"
+                                    Padding="0">
+                                <Grid ColumnDefinitions="*, Auto, Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding SensorName}"
+                                               FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="13" TextWrapping="Wrap"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="10,0">
+                                        <TextBlock Text="{Binding Value}" FontSize="16" FontWeight="Bold"
+                                                   Foreground="{StaticResource SuccessBrush}"/>
+                                        <TextBlock Text="{Binding Unit}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Bottom"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="2" CornerRadius="10" Padding="6,2" Margin="10,0,0,0"
+                                            Background="{Binding Status, Converter={StaticResource StatusToBrushConverter}}">
+                                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="White"
+                                                   HorizontalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding Measurements.Count, StringFormat='Всего показаний: {0}'}"
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+
+            <TextBlock Text="Активные проблемы" Classes="h2" Margin="0,20,0,10"/>
+            
+            <ItemsControl ItemsSource="{Binding ActiveProblems}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Classes="card" Margin="0,0,0,8">
+                            <Button Command="{Binding DataContext.ProblemClickCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent"
+                                    Padding="0">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Background="{StaticResource DangerBrush}"
+                                            CornerRadius="5" Width="4" Height="30" Margin="0,0,10,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding PipelineName}" FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
+                                        <TextBlock Text="{Binding Description}" FontSize="12"
+                                                   Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Type}" FontSize="11"
+                                                   Foreground="{StaticResource WarningBrush}" Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="{Binding NotificationDate, StringFormat=dd.MM.yyyy}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{Binding NotificationTime}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                        <Border Background="{Binding StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,5,0,0">
+                                            <TextBlock Text="{Binding Status}" FontSize="9" Foreground="White" HorizontalAlignment="Right"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding ActiveProblems.Count, StringFormat='Всего активных проблем: {0}'}"
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

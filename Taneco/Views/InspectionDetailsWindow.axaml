@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Taneco.ViewModels"
+        x:Class="Taneco.Views.InspectionDetailsWindow"
+        x:DataType="vm:InspectionDetailsViewModel"
+        Title="Детали проверки"
+        Width="550" Height="550"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,15">
+            <StackPanel>
+                <TextBlock Text="{Binding Inspection.ProblemType}" FontWeight="Bold" FontSize="16"/>
+                <TextBlock Text="Описание проблемы:" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,5"/>
+                <TextBlock Text="{Binding Inspection.ProblemDescription}" FontSize="13"
+                           Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                <TextBlock Text="Комментарий проверяющего:" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,5"/>
+                <TextBlock Text="{Binding Inspection.Description}" FontSize="13"
+                           Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                <Grid ColumnDefinitions="Auto,Auto" Margin="0,10,0,0">
+                    <TextBlock Text="Назначена:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                    <TextBlock Text="{Binding Inspection.EmployeeName}" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"/>
+                </Grid>
+                <TextBlock Text="{Binding Inspection.StartDate, StringFormat='Дата начала: dd.MM.yyyy'}" FontSize="11"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
+                <TextBlock Text="{Binding Inspection.EndDate, StringFormat='Дата завершения: dd.MM.yyyy'}" FontSize="11"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
+                <Border Background="{Binding Inspection.StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,10,0,0"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding Inspection.Status}" FontSize="10" Foreground="White"/>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Classes="card" Margin="0,0,0,15" IsVisible="{Binding CanTakeAction}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Действия инспектора" Classes="h3" Margin="0,0,0,10"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding CanStartInspection}">
+                    <Button Command="{Binding StartInspectionCommand}"
+                            Background="{StaticResource InfoBrush}"
+                            Padding="15,8">Начать проверку</Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding CanConfirmInspection}">
+                    <Button Command="{Binding ConfirmInspectionCommand}"
+                            Background="{StaticResource SuccessBrush}"
+                            Padding="15,8">Подтвердить</Button>
+                    <Button Command="{Binding RejectInspectionCommand}"
+                            Background="{StaticResource DangerBrush}"
+                            Padding="15,8">Отклонить</Button>
+                    <Button Command="{Binding DelayInspectionCommand}"
+                            Background="{StaticResource WarningBrush}"
+                            Padding="15,8">Отложить</Button>
+                </StackPanel>
+
+                <StackPanel IsVisible="{Binding ShowRejectReason}">
+                    <TextBox Watermark="Причина отклонения..."
+                             Text="{Binding RejectReason}"
+                             Height="80"
+                             TextWrapping="Wrap"
+                             Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                        <Button Command="{Binding SubmitRejectCommand}"
+                                Background="{StaticResource DangerBrush}"
+                                Padding="15,8">Отправить</Button>
+                        <Button Command="{Binding CancelRejectCommand}"
+                                Background="{StaticResource TextMutedBrush}"
+                                Padding="15,8">Отмена</Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel IsVisible="{Binding ShowAssignRepair}">
+                    <TextBlock Text="Требуется ремонт" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <Button Command="{Binding AssignRepairCommand}"
+                            Background="{StaticResource WarningBrush}"
+                            Padding="15,8">Назначить ремонт</Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+            <Button Command="{Binding CloseCommand}" Background="{StaticResource TextMutedBrush}" Padding="20,8">Закрыть</Button>
+        </StackPanel>
+    </Grid>
+</Window>

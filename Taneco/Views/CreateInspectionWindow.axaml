@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Taneco.ViewModels"
+        x:Class="Taneco.Views.CreateInspectionWindow"
+        x:DataType="vm:CreateInspectionViewModel"
+        Title="Создание плановой проверки"
+        Width="450" Height="450"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Выберите трубопровод" FontWeight="Bold"/>
+                <ComboBox ItemsSource="{Binding Pipelines}"
+                          SelectedItem="{Binding SelectedPipeline}"
+                          DisplayMemberBinding="{Binding Name}"
+                          Height="35"/>
+
+                <TextBlock Text="Тип проверки" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding InspectionTypes}"
+                          SelectedItem="{Binding SelectedInspectionType}"
+                          Height="35"/>
+
+                <TextBlock Text="Дата проведения" FontWeight="Bold" Margin="0,10,0,0"/>
+                <DatePicker SelectedDate="{Binding ScheduledDate}" Height="35"/>
+
+                <TextBlock Text="Описание" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Description}" Height="80" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,15,0,0">
+            <Button Command="{Binding CreateCommand}"
+                    IsEnabled="{Binding CanCreate}"
+                    Background="{StaticResource SuccessBrush}"
+                    Padding="20,8">Создать</Button>
+            <Button Command="{Binding CloseCommand}"
+                    Background="{StaticResource TextMutedBrush}"
+                    Padding="20,8">Отмена</Button>
+        </StackPanel>
+    </Grid>
+</Window>

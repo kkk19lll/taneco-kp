@@ -1,0 +1,191 @@
+<Window
+    x:Class="Taneco.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    Title="ТАНЕКО - Система мониторинга"
+    Width="1280"
+    Height="768"
+    x:DataType="vm:MainWindowViewModel"
+    WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+
+        <!--  Верхняя панель  -->
+        <Border
+            Height="50"
+            Background="{StaticResource HeaderBrush}"
+            DockPanel.Dock="Top">
+            <DockPanel>
+                <TextBlock
+                    Margin="15,0,0,0"
+                    VerticalAlignment="Center"
+                    FontSize="18"
+                    FontWeight="Bold"
+                    Foreground="{StaticResource AccentBrush}"
+                    Text="ТАНЕКО" />
+
+                <TextBlock
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{StaticResource TextMutedBrush}"
+                    Text="Мониторинг трубопроводных систем" />
+
+                <StackPanel
+                    Margin="0,0,15,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Border
+                        Padding="10,5"
+                        Background="#3C3C3C"
+                        CornerRadius="5">
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            Text="{Binding CurrentUser.FullName}" />
+                    </Border>
+                    <Border
+                        Margin="10,0,0,0"
+                        Padding="8,5"
+                        Background="{StaticResource AccentBrush}"
+                        CornerRadius="5">
+                        <TextBlock
+                            FontSize="11"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="{Binding CurrentUser.Role}" />
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!--  Левый сайдбар  -->
+        <Border
+            Width="200"
+            Background="{StaticResource SidebarBrush}"
+            DockPanel.Dock="Left">
+            <StackPanel Margin="0,15,0,0">
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowMonitoringCommand}"
+                    IsVisible="{Binding CanMonitor}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Мониторинг" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowEquipmentsCommand}"
+                    IsVisible="{Binding CanEditSensors}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Оборудование" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowProblemsCommand}"
+                    IsVisible="{Binding CanManageProblems}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Проблемы" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowInspectionsCommand}"
+                    IsVisible="{Binding CanViewInspections}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Проверки" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowRepairsCommand}"
+                    IsVisible="{Binding CanManageRepairs}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Ремонты" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowStaffCommand}"
+                    IsVisible="{Binding CanManageStaff}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Персонал" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding ShowReportsCommand}"
+                    IsVisible="{Binding CanViewReports}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Отчеты" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
+                    Command="{Binding LogoutCommand}"
+                    Foreground="{StaticResource DangerBrush}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Выход" />
+                    </StackPanel>
+                </Button>
+
+            </StackPanel>
+        </Border>
+
+        <!--  Основной контент  -->
+        <Border Background="{StaticResource BackgroundBrush}">
+            <DockPanel>
+                <Border
+                    Height="40"
+                    Background="{StaticResource HeaderBrush}"
+                    DockPanel.Dock="Top">
+                    <TextBlock
+                        Margin="15,0"
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource TextPrimaryBrush}"
+                        Text="{Binding CurrentTitle}" />
+                </Border>
+
+                <ContentControl Margin="10" Content="{Binding CurrentView}" />
+            </DockPanel>
+        </Border>
+
+    </DockPanel>
+</Window>

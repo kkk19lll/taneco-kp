@@ -1,0 +1,216 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Taneco.ViewModels"
+             x:Class="Taneco.Views.EquipmentsView"
+             x:DataType="vm:EquipmentsViewModel">
+
+    <TabControl Margin="10">
+
+        <!-- Вкладка: Датчики -->
+        <TabItem Header="Датчики">
+            <Grid ColumnDefinitions="1.5*, 2.5*">
+
+                <Border Grid.Column="0" Background="{StaticResource CardBrush}" Margin="0,10,5,10" CornerRadius="8">
+                    <StackPanel>
+                        <TextBox Watermark="Поиск по датчикам..." Text="{Binding SensorSearchText, Mode=TwoWay}" Margin="10" Height="35"/>
+                        
+                        <ScrollViewer Height="400">
+                            <ListBox ItemsSource="{Binding Sensors}" SelectedItem="{Binding SelectedSensor}" BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="10" Margin="0,0,0,1">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ControlPoint}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Model}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                    <TextBlock Text="{Binding MeasurementType}" FontSize="10" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock Text="/" FontSize="10" Foreground="{StaticResource TextDarkBrush}"/>
+                                                    <TextBlock Text="{Binding Unit}" FontSize="10" Foreground="{StaticResource TextDarkBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+                        
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10,0,10">
+                            <Button Command="{Binding LoadSensorsCommand}" Padding="15,8">Обновить</Button>
+                            <Button Command="{Binding CreateSensorCommand}" 
+                                    IsVisible="{Binding CanCreateEquipment}"
+                                    Background="{StaticResource WarningBrush}" 
+                                    Padding="15,8">Создать датчик</Button>
+                        </StackPanel>
+                        
+                        <TextBlock Text="{Binding Sensors.Count, StringFormat='Всего датчиков: {0}'}" 
+                                   FontSize="11" Foreground="{StaticResource TextMutedBrush}" 
+                                   HorizontalAlignment="Center" Margin="10"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Правая панель - детальная информация о датчике -->
+                <Border Grid.Column="1" Background="{StaticResource CardBrush}" Margin="5,10,10,10" CornerRadius="8">
+                    <ScrollViewer>
+                        <StackPanel Margin="15">
+
+                            <TextBlock Text="Информация о датчике" Classes="h2" Margin="0,0,0,15"/>
+
+                            <!-- Показываем когда датчик выбран -->
+                            <StackPanel IsVisible="{Binding IsSensorSelected}">
+
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="120,*" Margin="0,0,0,15">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Наименование:" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedSensor.ControlPoint}" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Модель:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedSensor.Model}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Производитель:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedSensor.Manufacturer}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Страна:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedSensor.ManufacturerCountry}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Тип:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedSensor.Type}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Измеряет:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedSensor.MeasurementType}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Единица:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedSensor.Unit}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Трубопровод:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedSensor.PipelineName}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Местоположение:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding SelectedSensor.Location}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                </Grid>
+
+                                <!-- Последний замер -->
+                                <Border Background="{StaticResource BorderBrush}" CornerRadius="8" Padding="12" Margin="0,0,0,15">
+                                    <StackPanel>
+                                        <TextBlock Text="Последний замер" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5"/>
+                                        <TextBlock Text="{Binding SelectedSensor.LastMeasurementValue, StringFormat='Значение: {0}'}" FontSize="12"/>
+                                        <TextBlock Text="{Binding SelectedSensor.LastMeasurementDate, StringFormat='Дата: dd.MM.yyyy HH:mm'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{StaticResource BorderBrush}" CornerRadius="8" Padding="12">
+                                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Мин." Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Макс." Foreground="{StaticResource TextMutedBrush}" FontSize="12" HorizontalAlignment="Left" Margin="5,0,0,0"/>
+                                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding EditMinValue}" IsEnabled="{Binding IsEditMode}" Margin="0,5,5,0" Height="35"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditMaxValue}" IsEnabled="{Binding IsEditMode}" Margin="5,5,0,0" Height="35"/>
+                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,15,0,0" Spacing="10">
+                                            <Button Command="{Binding EditCommand}" IsVisible="{Binding IsEditButtonVisible}" Background="{StaticResource WarningBrush}" Foreground="White" Padding="15,8">Редактировать</Button>
+                                            <Button Command="{Binding SaveThresholdsCommand}" IsVisible="{Binding IsEditMode}" Background="{StaticResource SuccessBrush}" Foreground="White" Padding="15,8">Сохранить</Button>
+                                            <Button Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditMode}" Background="{StaticResource TextMutedBrush}" Foreground="White" Padding="15,8">Отмена</Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Text="{Binding SelectedSensor.LastCalibration, StringFormat='Последняя поверка: dd.MM.yyyy'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,15,0,0"/>
+                                <TextBlock Text="{Binding SelectedSensor.ProductionYear, StringFormat='Год выпуска: {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
+                            </StackPanel>
+
+                            <!-- Показываем когда датчик НЕ выбран -->
+                            <TextBlock IsVisible="{Binding !IsSensorSelected}"
+                                       Text="Выберите датчик из списка слева"
+                                       FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                                       HorizontalAlignment="Center" Margin="0,50,0,0"/>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </TabItem>
+
+        <!-- Вкладка: Трубопроводы -->
+        <TabItem Header="Трубопроводы">
+            <Grid ColumnDefinitions="1.5*, 2.5*">
+
+                <Border Grid.Column="0" Background="{StaticResource CardBrush}" Margin="0,10,5,10" CornerRadius="8">
+                    <StackPanel>
+                        <TextBox Watermark="Поиск по трубопроводам..." Text="{Binding PipelineSearchText, Mode=TwoWay}" Margin="10" Height="35"/>
+                        
+                        <ScrollViewer Height="400">
+                            <ListBox ItemsSource="{Binding Pipelines}" SelectedItem="{Binding SelectedPipeline}" BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="10" Margin="0,0,0,1">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
+                                                <TextBlock Text="{Binding Material}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <TextBlock Text="{Binding LengthWithUnit}" FontSize="10" Foreground="{StaticResource TextDarkBrush}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+                        
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10,0,10">
+                            <Button Command="{Binding LoadPipelinesCommand}" Padding="15,8">Обновить</Button>
+                            <Button Command="{Binding CreatePipelineCommand}" 
+                                    IsVisible="{Binding CanCreateEquipment}"
+                                    Background="{StaticResource WarningBrush}" 
+                                    Padding="15,8">Создать трубопровод</Button>
+                        </StackPanel>
+                        
+                        <TextBlock Text="{Binding Pipelines.Count, StringFormat='Всего трубопроводов: {0}'}" 
+                                   FontSize="11" Foreground="{StaticResource TextMutedBrush}" 
+                                   HorizontalAlignment="Center" Margin="10"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Правая панель - детальная информация о трубопроводе -->
+                <Border Grid.Column="1" Background="{StaticResource CardBrush}" Margin="5,10,10,10" CornerRadius="8">
+                    <ScrollViewer>
+                        <StackPanel Margin="15">
+
+                            <TextBlock Text="Информация о трубопроводе" Classes="h2" Margin="0,0,0,15"/>
+
+                            <!-- Показываем когда трубопровод выбран -->
+                            <StackPanel IsVisible="{Binding IsPipelineSelected}">
+
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="120,*" Margin="0,0,0,15">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Наименование:" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedPipeline.Name}" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Материал:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedPipeline.Material}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Протяженность:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedPipeline.LengthWithUnit}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Диаметр:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedPipeline.DiameterWithUnit}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Дата установки:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedPipeline.InstallationDate, StringFormat='dd.MM.yyyy'}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Год установки:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedPipeline.InstallationYear}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Возраст:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
+                                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedPipeline.AgeWithUnit}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
+                                </Grid>
+
+                                <!-- Последний ремонт -->
+                                <Border Background="{StaticResource BorderBrush}" CornerRadius="8" Padding="12">
+                                    <StackPanel>
+                                        <TextBlock Text="Последний ремонт" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5"/>
+                                        <TextBlock Text="{Binding SelectedPipeline.LastRepairDate, StringFormat='Дата: dd.MM.yyyy'}" FontSize="12"/>
+                                        <TextBlock Text="{Binding SelectedPipeline.LastRepairStatus, StringFormat='Статус: {0}'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                </Border>
+
+                            </StackPanel>
+
+                            <!-- Показываем когда трубопровод НЕ выбран -->
+                            <TextBlock IsVisible="{Binding !IsPipelineSelected}"
+                                       Text="Выберите трубопровод из списка слева"
+                                       FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                                       HorizontalAlignment="Center" Margin="0,50,0,0"/>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </TabItem>
+
+    </TabControl>
+</UserControl>

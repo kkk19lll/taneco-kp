@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Taneco.ViewModels"
+             x:Class="Taneco.Views.RepairsView"
+             x:DataType="vm:RepairsViewModel">
+    <ScrollViewer>
+        <StackPanel Margin="15">
+            <TextBlock Text="Управление ремонтами" Classes="h1" Margin="0,0,0,15"/>
+
+            <Border Classes="card" Margin="0,0,0,15">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                    <Button Command="{Binding LoadCommand}" Padding="15,8">Обновить</Button>
+                    <Button Command="{Binding CreateReportCommand}"
+                            IsVisible="{Binding CanCreateReport}"
+                            Background="{StaticResource InfoBrush}"
+                            Padding="15,8">Составить отчёт</Button>
+                    <TextBlock Text="Статус:" VerticalAlignment="Center" Margin="20,0,5,0"/>
+                    <ComboBox ItemsSource="{Binding StatusFilters}"
+                              SelectedItem="{Binding SelectedStatusFilter}"
+                              Width="140"/>
+                </StackPanel>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding FilteredRepairs}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Classes="card" Margin="0,0,0,8">
+                            <Button Command="{Binding $parent[ItemsControl].DataContext.RepairClickCommand}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent"
+                                    Padding="0">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Background="{Binding StatusColor}" CornerRadius="5"
+                                            Width="4" Height="40" Margin="0,0,10,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding ProblemDescription}" FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
+                                                   TextWrapping="Wrap" MaxHeight="40"/>
+                                        <TextBlock Text="{Binding TeamName}" FontSize="11"
+                                                   Foreground="{StaticResource TextDarkBrush}"/>
+                                        <TextBlock Text="{Binding Budget, StringFormat='Бюджет: {0:C}'}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="{Binding StartDate, StringFormat='dd.MM.yyyy'}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                        <Border Background="{Binding StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,5,0,0">
+                                            <TextBlock Text="{Binding Status}" FontSize="10" Foreground="White"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding FilteredRepairs.Count, StringFormat='Всего ремонтов: {0}'}"
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

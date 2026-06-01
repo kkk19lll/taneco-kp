@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Основные цвета -->
+    <Color x:Key="BackgroundColor">#1E1E1E</Color>
+    <Color x:Key="SidebarColor">#252526</Color>
+    <Color x:Key="CardColor">#2D2D30</Color>
+    <Color x:Key="HeaderColor">#2D2D30</Color>
+    
+    <!-- Текст -->
+    <Color x:Key="TextPrimary">#FFFFFF</Color>
+    <Color x:Key="TextSecondary">#CCCCCC</Color>
+    <Color x:Key="TextMuted">#888888</Color>
+    <Color x:Key="TextDark">#666666</Color>
+    
+    <!-- Акцентные цвета -->
+    <Color x:Key="AccentColor">#007ACC</Color>
+    <Color x:Key="AccentHover">#005A9E</Color>
+    <Color x:Key="SuccessColor">#4CAF50</Color>
+    <Color x:Key="WarningColor">#F39C12</Color>
+    <Color x:Key="DangerColor">#E74C3C</Color>
+    <Color x:Key="InfoColor">#3498DB</Color>
+    
+    <!-- Границы -->
+    <Color x:Key="BorderColor">#3C3C3C</Color>
+    <Color x:Key="SeparatorColor">#3C3C3C</Color>
+    
+    <!-- Кисти -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource SidebarColor}"/>
+    <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}"/>
+    <SolidColorBrush x:Key="HeaderBrush" Color="{StaticResource HeaderColor}"/>
+    
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}"/>
+    <SolidColorBrush x:Key="TextDarkBrush" Color="{StaticResource TextDark}"/>
+    
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHover}"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+    
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="SeparatorBrush" Color="{StaticResource SeparatorColor}"/>
+    
+</ResourceDictionary>

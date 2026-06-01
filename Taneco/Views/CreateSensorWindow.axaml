@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Taneco.ViewModels"
+        x:Class="Taneco.Views.CreateSensorWindow"
+        x:DataType="vm:CreateSensorViewModel"
+        Title="Создание датчика"
+        Width="500" Height="600"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="12">
+
+                <TextBlock Text="Наименование (точка контроля)" FontWeight="Bold"/>
+                <TextBox Text="{Binding ControlPoint}" Watermark="Введите наименование" Height="35"/>
+                <TextBlock IsVisible="{Binding ControlPointError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Модель" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Model}" Watermark="Введите модель" Height="35"/>
+                <TextBlock IsVisible="{Binding ModelError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Производитель" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Manufacturer}" Watermark="Введите производителя" Height="35"/>
+                <TextBlock IsVisible="{Binding ManufacturerError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Страна" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Country}" Watermark="Введите страну" Height="35"/>
+
+                <TextBlock Text="Тип датчика" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding SensorTypes}" SelectedItem="{Binding SelectedSensorType}" Height="35"/>
+
+                <TextBlock Text="Тип измерения" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding MeasurementTypes}" SelectedItem="{Binding SelectedMeasurementType}" Height="35"/>
+
+                <TextBlock Text="Единица измерения" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding Units}" SelectedItem="{Binding SelectedUnit}" Height="35"/>
+
+                <Grid ColumnDefinitions="*,*">
+                    <TextBlock Grid.Column="0" Text="Минимальное значение" FontWeight="Bold"/>
+                    <TextBlock Grid.Column="1" Text="Максимальное значение" FontWeight="Bold"/>
+                    <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding MinValue}" Watermark="Мин" Margin="0,5,5,0" Height="35"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MaxValue}" Watermark="Макс" Margin="5,5,0,0" Height="35"/>
+                </Grid>
+
+                <TextBlock Text="Трубопровод" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding Pipelines}" SelectedItem="{Binding SelectedPipeline}"
+                          DisplayMemberBinding="{Binding Name}" Height="35"/>
+
+                <TextBlock Text="Местоположение" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Location}" Watermark="Введите местоположение" Height="35" TextWrapping="Wrap"/>
+
+                <TextBlock Text="Год выпуска" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding ProductionYear}" Watermark="ГГГГ" Height="35"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,15,0,0">
+            <Button Command="{Binding CreateCommand}" 
+                    IsEnabled="{Binding CanCreate}"
+                    Background="{StaticResource SuccessBrush}" Padding="20,8">Создать</Button>
+            <Button Command="{Binding CloseCommand}" 
+                    Background="{StaticResource TextMutedBrush}" Padding="20,8">Отмена</Button>
+        </StackPanel>
+
+    </Grid>
+</Window>

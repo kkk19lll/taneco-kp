@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Taneco", "Taneco\Taneco.csproj", "{8068C1B0-54F5-9BAB-A875-1550178685D6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8068C1B0-54F5-9BAB-A875-1550178685D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8068C1B0-54F5-9BAB-A875-1550178685D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8068C1B0-54F5-9BAB-A875-1550178685D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8068C1B0-54F5-9BAB-A875-1550178685D6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BF5A6041-6DB7-44B0-8BA7-73F90792B88E}
+	EndGlobalSection
+EndGlobal

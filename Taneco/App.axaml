@@ -1,0 +1,22 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:Taneco.Converters"
+             x:Class="Taneco.App">
+    
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Taneco/Styles/Colors.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <conv:StatusToBrushConverter x:Key="StatusToBrushConverter" />
+            
+        </ResourceDictionary>
+    </Application.Resources>
+    
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Taneco/Styles/GlobalStyles.axaml"/>
+    </Application.Styles>
+    
+</Application>

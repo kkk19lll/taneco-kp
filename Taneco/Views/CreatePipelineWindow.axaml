@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Taneco.ViewModels"
+        x:Class="Taneco.Views.CreatePipelineWindow"
+        x:DataType="vm:CreatePipelineViewModel"
+        Title="Создание трубопровода"
+        Width="450" Height="450"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="12">
+
+                <TextBlock Text="Наименование трубопровода" FontWeight="Bold"/>
+                <TextBox Text="{Binding Name}" Watermark="Введите наименование" Height="35"/>
+                <TextBlock IsVisible="{Binding NameError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Материал" FontWeight="Bold" Margin="0,10,0,0"/>
+                <ComboBox ItemsSource="{Binding Materials}" SelectedItem="{Binding SelectedMaterial}" Height="35"/>
+
+                <TextBlock Text="Протяженность (м)" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Length}" Watermark="Введите протяженность" Height="35"/>
+                <TextBlock IsVisible="{Binding LengthError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Диаметр (м)" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBox Text="{Binding Diameter}" Watermark="Введите диаметр" Height="35"/>
+                <TextBlock IsVisible="{Binding DiameterError}" Text="Обязательное поле" Foreground="{StaticResource DangerBrush}" FontSize="10" Margin="5,0,0,0"/>
+
+                <TextBlock Text="Дата установки" FontWeight="Bold" Margin="0,10,0,0"/>
+                <DatePicker SelectedDate="{Binding InstallationDate}" Height="35"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,15,0,0">
+            <Button Command="{Binding CreateCommand}" 
+                    IsEnabled="{Binding CanCreate}"
+                    Background="{StaticResource SuccessBrush}" Padding="20,8">Создать</Button>
+            <Button Command="{Binding CloseCommand}" 
+                    Background="{StaticResource TextMutedBrush}" Padding="20,8">Отмена</Button>
+        </StackPanel>
+
+    </Grid>
+</Window>

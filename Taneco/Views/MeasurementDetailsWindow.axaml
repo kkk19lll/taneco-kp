@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Taneco.ViewModels"
+        x:Class="Taneco.Views.MeasurementDetailsWindow"
+        x:DataType="vm:MeasurementDetailsViewModel"
+        Title="История показаний датчика"
+        Width="600" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+
+        <!-- Информация о датчике -->
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,15">
+            <StackPanel>
+                <TextBlock Text="{Binding Measurement.SensorName}" FontWeight="Bold" FontSize="16"/>
+                <TextBlock Text="{Binding Measurement.PipelineName}" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                <Grid ColumnDefinitions="Auto,Auto" Margin="0,10,0,0">
+                    <TextBlock Text="Текущее значение:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                    <TextBlock Text="{Binding Measurement.Value}" FontSize="16" FontWeight="Bold" 
+                               Foreground="{StaticResource SuccessBrush}" Margin="10,0,0,0"/>
+                    <TextBlock Text="{Binding Measurement.Unit}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0"/>
+                </Grid>
+                <TextBlock Text="{Binding Measurement.Date, StringFormat='Дата замера: dd.MM.yyyy HH:mm:ss'}" FontSize="11" 
+                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Выбор периода -->
+        <Border Grid.Row="1" Classes="card" Margin="0,0,0,15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                <Button Command="{Binding ShowWeekCommand}" 
+                        Background="{StaticResource InfoBrush}" Padding="15,8">Неделя</Button>
+                <Button Command="{Binding ShowMonthCommand}" 
+                        Background="{StaticResource InfoBrush}" Padding="15,8">Месяц</Button>
+                <Button Command="{Binding ShowYearCommand}" 
+                        Background="{StaticResource InfoBrush}" Padding="15,8">Год</Button>
+            </StackPanel>
+        </Border>
+
+        <!-- График (заглушка, будет график) -->
+        <Border Grid.Row="2" Classes="card">
+            <StackPanel>
+                <TextBlock Text="График изменения показаний" Classes="h3" Margin="0,0,0,10"/>
+                <ItemsControl ItemsSource="{Binding HistoryMeasurements}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="5" Padding="8" Margin="0,0,0,3">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" FontSize="11"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="Bold"
+                                               Foreground="{StaticResource SuccessBrush}" Margin="10,0,0,0"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Unit}" FontSize="11" 
+                                               Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding HistoryMeasurements.Count, StringFormat='Всего записей: {0}'}" 
+                           FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Кнопка закрытия -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+            <Button Command="{Binding CloseCommand}" Background="{StaticResource TextMutedBrush}" Padding="20,8">Закрыть</Button>
+        </StackPanel>
+
+    </Grid>
+</Window>
