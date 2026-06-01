@@ -1,8 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Taneco.ViewModels"
+             xmlns:models="clr-namespace:Taneco.Models"
              x:Class="Taneco.Views.RepairsView"
-             x:DataType="vm:RepairsViewModel">
+             x:DataType="vm:RepairsViewModel"
+             x:CompileBindings="True">
     <ScrollViewer>
         <StackPanel Margin="15">
             <TextBlock Text="Управление ремонтами" Classes="h1" Margin="0,0,0,15"/>
@@ -23,9 +25,9 @@
 
             <ItemsControl ItemsSource="{Binding FilteredRepairs}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:CompileBindings="False">
                         <Border Classes="card" Margin="0,0,0,8">
-                            <Button Command="{Binding $parent[ItemsControl].DataContext.RepairClickCommand}"
+                            <Button Command="{Binding $parent[UserControl].DataContext.RepairClickCommand}"
                                     CommandParameter="{Binding}"
                                     Background="Transparent"
                                     Padding="0">
