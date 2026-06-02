@@ -6,161 +6,210 @@
     x:DataType="viewModels:EquipmentManagementViewModel">
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="350" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!--  Левая панель  -->
-        <Grid Grid.Column="0" RowDefinitions="Auto, *">
-            <!--  Кнопка обновить список на всю ширину внизу  -->
-            <Button
-                Margin="10"
-                HorizontalAlignment="Stretch"
-                Command="{Binding RefreshEquipmentListCommand}"
-                Content="⟳ Обновить список"
-                DockPanel.Dock="Bottom" />
+        <!--  Табы  -->
+        <TabControl
+            Grid.Row="0"
+            Margin="10,10,10,0"
+            SelectedIndex="{Binding SelectedTabIndex}">
+            <TabItem Header="Трубопроводы" />
+            <TabItem Header="Датчики" />
+        </TabControl>
 
-            <!--  Контент левой панели  -->
-            <Border Grid.Row="1" Background="{DynamicResource RegionColor}">
-                <DockPanel>
+        <!--  Основной контент  -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="350" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!--  Левая панель  -->
+            <Border Grid.Column="0" Background="{DynamicResource RegionColor}">
+                <Grid RowDefinitions="Auto,*,Auto,Auto">
                     <!--  Поиск  -->
-                    <StackPanel Margin="10" DockPanel.Dock="Top">
-                        <TextBox
-                            Text="{Binding SearchText}"
-                            TextChanged="SearchBox_OnTextChanged"
-                            Watermark="Поиск по наименованию модели, производителя или типа..." />
-                    </StackPanel>
+                    <TextBox
+                        Grid.Row="0"
+                        Margin="10"
+                        Text="{Binding SearchText}"
+                        Watermark="Поиск..." />
 
                     <!--  Список оборудования  -->
-                    <ScrollViewer>
+                    <ScrollViewer Grid.Row="1">
                         <ListBox
                             Margin="10"
-                            ItemsSource="{Binding EquipmentList}"
+                            ItemsSource="{Binding FilteredEquipmentList}"
                             SelectedItem="{Binding SelectedEquipment}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,2" Padding="8">
                                         <StackPanel>
-                                            <TextBlock FontWeight="Bold" Text="{Binding Model}" />
+                                            <!--  Для датчиков: модель + точка контроля  -->
+                                            <!--  Для трубопроводов: название + протяженность  -->
+                                            <TextBlock FontWeight="Bold" Text="{Binding DisplayName}" />
                                             <TextBlock
                                                 FontSize="11"
                                                 Opacity="0.7"
-                                                Text="{Binding Manufacturer}" />
-                                            <TextBlock
-                                                FontSize="11"
-                                                Opacity="0.6"
-                                                Text="{Binding Type}" />
-                                            <TextBlock
-                                                FontSize="10"
-                                                Opacity="0.5"
-                                                Text="{Binding InstallationLocation}" />
+                                                Text="{Binding DisplayDetail}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </ScrollViewer>
-                </DockPanel>
+
+                    <!--  Кнопка обновить данные  -->
+                    <Button
+                        Grid.Row="2"
+                        Margin="10,5,10,5"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding RefreshDataCommand}"
+                        Content="⟳ Обновить данные" />
+
+                    <!--  Счетчик  -->
+                    <TextBlock
+                        Grid.Row="3"
+                        Margin="10,0,10,10"
+                        HorizontalAlignment="Center"
+                        FontSize="12"
+                        Opacity="0.6"
+                        Text="{Binding EquipmentCountText}" />
+                </Grid>
+            </Border>
+
+            <!--  Разделитель  -->
+            <GridSplitter
+                Grid.Column="1"
+                Width="4"
+                Background="{DynamicResource ThemeControlHighlightMidBrush}" />
+
+            <!--  Правая панель  -->
+            <Border Grid.Column="2" Background="{DynamicResource ThemeControlBackgroundBrush}">
+                <Grid>
+                    <ScrollViewer IsVisible="{Binding ShowDetailsPanel}">
+                        <StackPanel Margin="15">
+                            <!--  Заголовок  -->
+                            <TextBlock
+                                Margin="0,0,0,15"
+                                FontSize="16"
+                                FontWeight="Bold"
+                                Text="{Binding DetailsTitle}" />
+
+                            <!--  Краткая информация  -->
+                            <Border
+                                Padding="15"
+                                Background="{DynamicResource RegionColor}"
+                                CornerRadius="8">
+                                <StackPanel Spacing="10">
+                                    <!--  Для датчиков: модель + точка контроля  -->
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        Text="Основная информация:" />
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <TextBlock FontWeight="Bold" Text="{Binding DetailLabel1}: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding DetailValue1}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <TextBlock FontWeight="Bold" Text="{Binding DetailLabel2}: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding DetailValue2}" />
+                                    </Grid>
+
+                                    <!--  Разделитель для датчиков  -->
+                                    <Border
+                                        Height="1"
+                                        Margin="0,5"
+                                        Background="{DynamicResource ThemeControlHighlightMidBrush}"
+                                        IsVisible="{Binding IsSensorSelected}" />
+
+                                    <!--  Доп. информация для трубопроводов  -->
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        IsVisible="{Binding IsPipelineSelected}"
+                                        Text="Дополнительно:" />
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsPipelineSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Дата установки: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.InstallationDate, StringFormat={}{0:dd.MM.yyyy}}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsPipelineSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Материал: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Material}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsPipelineSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Диаметр: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Diameter, StringFormat={}{0} мм}" />
+                                    </Grid>
+
+                                    <!--  Доп. информация для датчиков  -->
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        IsVisible="{Binding IsSensorSelected}"
+                                        Text="Дополнительно:" />
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsSensorSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Тип: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Type}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsSensorSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Производитель: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Manufacturer}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsSensorSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Трубопровод: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.PipelineName}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" IsVisible="{Binding IsSensorSelected}">
+                                        <TextBlock FontWeight="Bold" Text="Местоположение: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.InstallationLocation}" />
+                                    </Grid>
+
+                                    <!--  Разделитель  -->
+                                    <Border
+                                        Height="1"
+                                        Margin="0,5"
+                                        Background="{DynamicResource ThemeControlHighlightMidBrush}" />
+
+                                    <!--  Последнее действие  -->
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        Text="Последнее действие:" />
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <TextBlock FontWeight="Bold" Text="Тип: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding LastActionType}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <TextBlock FontWeight="Bold" Text="Значение/Результат: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding LastActionValue}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <TextBlock FontWeight="Bold" Text="Дата: " />
+                                        <TextBlock Grid.Column="1" Text="{Binding LastActionDate, StringFormat={}{0:dd.MM.yyyy HH:mm}}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!--  Заглушка при отсутствии выбора  -->
+                    <Border
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding !ShowDetailsPanel}">
+                        <TextBlock
+                            MaxWidth="300"
+                            Opacity="0.5"
+                            Text="{Binding EmptySelectionText}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
-
-        <!--  Разделитель  -->
-        <GridSplitter
-            Grid.Column="1"
-            Width="4"
-            Background="{DynamicResource ThemeControlHighlightMidBrush}" />
-
-        <!--  Правая панель  -->
-        <Border Grid.Column="2" Background="{DynamicResource ThemeControlBackgroundBrush}">
-            <Grid>
-                <ScrollViewer IsVisible="{Binding ShowDetailsPanel}">
-                    <StackPanel Margin="15">
-                        <TextBlock
-                            Margin="0,0,0,15"
-                            FontSize="16"
-                            FontWeight="Bold"
-                            Text="Детальная информация об оборудовании" />
-
-                        <Border
-                            Padding="15"
-                            Background="{DynamicResource RegionColor}"
-                            CornerRadius="8">
-                            <StackPanel Spacing="10">
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Модель:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Model}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Производитель:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Manufacturer}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Страна:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ManufacturerCountry}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Тип:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Type}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Точка контроля:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ControlPoint}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Тип измерения:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.MeasurementType}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Ед. измерения:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Unit}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Диапазон:" />
-                                    <StackPanel
-                                        Grid.Column="1"
-                                        Orientation="Horizontal"
-                                        Spacing="5">
-                                        <TextBlock Text="{Binding SelectedEquipmentDetails.MinValue}" />
-                                        <TextBlock Text="-" />
-                                        <TextBlock Text="{Binding SelectedEquipmentDetails.MaxValue}" />
-                                        <TextBlock Text="{Binding SelectedEquipmentDetails.Unit}" />
-                                    </StackPanel>
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Трубопровод:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.PipelineName}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Местоположение:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.InstallationLocation}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Год выпуска:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ProductionYear}" />
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *">
-                                    <TextBlock FontWeight="Bold" Text="Последняя поверка:" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.LastCalibration, StringFormat={}{0:dd.MM.yyyy}}" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <Border
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    IsVisible="{Binding !ShowDetailsPanel}">
-                    <TextBlock
-                        MaxWidth="300"
-                        Opacity="0.5"
-                        Text="Выберите оборудование из списка слева для просмотра детальной информации"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
-                </Border>
-            </Grid>
-        </Border>
     </Grid>
 </UserControl>

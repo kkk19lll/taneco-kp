@@ -1,4 +1,4 @@
-// Views/EquipmentManagementView.axaml.cs
+// Views/EquipmentManagementView.axaml.cs (без изменений, но для полноты)
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -34,11 +34,10 @@ public partial class EquipmentManagementView : UserControl
         }
         else
         {
-            // Задержка для удобства ввода
             await Task.Delay(300);
             if (textBox.Text == _viewModel.SearchText)
             {
-                await _viewModel.SearchEquipmentAsync();
+                _viewModel.SearchText = textBox.Text;
             }
         }
     }
