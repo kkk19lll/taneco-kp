@@ -1,83 +1,269 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:Taneco.ViewModels"
-        x:Class="Taneco.Views.ProblemDetailsWindow"
-        x:DataType="vm:ProblemDetailsViewModel"
-        Title="Детали проблемы"
-        Width="500" Height="550"
-        WindowStartupLocation="CenterOwner"
-        CanResize="False">
+<Window
+    x:Class="Taneco.Views.ProblemDetailsWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    Title="Детали проблемы"
+    Width="900"
+    Height="750"
+    x:DataType="vm:ProblemDetailsViewModel"
+    Background="{StaticResource BackgroundBrush}"
+    CanResize="False"
+    WindowStartupLocation="CenterOwner">
 
-    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+    <Grid RowDefinitions="Auto,*,Auto">
 
-        <!-- Информация о проблеме -->
-        <Border Grid.Row="0" Classes="card" Margin="0,0,0,15">
-            <StackPanel>
-                <TextBlock Text="{Binding Problem.PipelineName}" FontWeight="Bold" FontSize="16"/>
-                <TextBlock Text="{Binding Problem.Type}" FontSize="12" Foreground="{StaticResource WarningBrush}"/>
-                <TextBlock Text="{Binding Problem.Description}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" 
-                           TextWrapping="Wrap" Margin="0,10,0,0"/>
-                <Grid ColumnDefinitions="Auto,Auto" Margin="0,10,0,0">
-                    <TextBlock Text="Отклонение:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                    <TextBlock Text="{Binding Problem.MeasuredValue} / {Binding Problem.ThresholdValue}" FontSize="14" FontWeight="Bold" 
-                               Foreground="{StaticResource DangerBrush}" Margin="10,0,0,0"/>
-                </Grid>
-                <TextBlock Text="{Binding Problem.NotificationDate, StringFormat='Дата обнаружения: dd.MM.yyyy'}" FontSize="11" 
-                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
-                <Border Background="{Binding Problem.StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,10,0,0" 
-                        HorizontalAlignment="Left">
-                    <TextBlock Text="{Binding Problem.Status}" FontSize="10" Foreground="White"/>
+        <Border
+            Grid.Row="0"
+            Height="80"
+            Background="{StaticResource HeaderBrush}">
+            <StackPanel Margin="20,0" VerticalAlignment="Center">
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="Bold"
+                    Foreground="{StaticResource TextPrimaryBrush}"
+                    Text="Детали проблемы" />
+                <TextBlock
+                    Margin="0,5,0,0"
+                    FontSize="12"
+                    Foreground="{StaticResource TextSecondaryBrush}"
+                    Text="{Binding Problem.PipelineName}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="20" RowDefinitions="Auto,Auto,Auto">
+
+                <Border
+                    Grid.Row="0"
+                    Margin="0,0,0,20"
+                    Padding="15"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+                        <Border
+                            Grid.Row="0"
+                            Padding="8,4"
+                            HorizontalAlignment="Left"
+                            Background="{StaticResource WarningBrush}"
+                            CornerRadius="6">
+                            <TextBlock
+                                FontSize="11"
+                                FontWeight="Bold"
+                                Foreground="White"
+                                Text="{Binding Problem.Type}" />
+                        </Border>
+
+                        <TextBlock
+                            Grid.Row="1"
+                            Margin="0,15,0,0"
+                            FontSize="13"
+                            Foreground="{StaticResource TextSecondaryBrush}"
+                            Text="{Binding Problem.Description}"
+                            TextWrapping="Wrap" />
+
+                        <Border
+                            Grid.Row="2"
+                            Margin="0,15,0,0"
+                            Padding="12,8"
+                            Background="{StaticResource DangerBackgroundBrush}"
+                            BorderBrush="{StaticResource DangerBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <TextBlock
+                                    Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource DangerBrush}"
+                                    Text="Отклонение:" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Margin="10,0,0,0"
+                                    VerticalAlignment="Center"
+                                    FontSize="16"
+                                    FontWeight="Bold"
+                                    Foreground="{StaticResource DangerBrush}">
+                                    <Run Text="{Binding Problem.MeasuredValue}" />
+                                    <Run
+                                        FontSize="12"
+                                        FontWeight="Normal"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text=" / " />
+                                    <Run
+                                        FontSize="12"
+                                        FontWeight="Normal"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="{Binding Problem.ThresholdValue}" />
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock
+                            Grid.Row="3"
+                            Margin="0,12,0,0"
+                            FontSize="11"
+                            Foreground="{StaticResource TextMutedBrush}"
+                            Text="{Binding Problem.NotificationDate, StringFormat='📅 Дата обнаружения: dd.MM.yyyy'}" />
+
+                        <Border
+                            Grid.Row="4"
+                            Margin="0,12,0,0"
+                            Padding="8,4"
+                            HorizontalAlignment="Left"
+                            Background="{Binding Problem.StatusColor}"
+                            CornerRadius="6">
+                            <TextBlock
+                                FontSize="11"
+                                FontWeight="SemiBold"
+                                Foreground="White"
+                                Text="{Binding Problem.Status}" />
+                        </Border>
+
+                    </Grid>
                 </Border>
-            </StackPanel>
-        </Border>
 
-        <!-- Кнопки действий (только для оператора) -->
-        <Border Grid.Row="1" Classes="card" Margin="0,0,0,15" IsVisible="{Binding CanTakeAction}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="Действия" Classes="h3" Margin="0,0,0,10"/>
-                <Button Command="{Binding AssignInspectionCommand}" 
-                        Background="{StaticResource WarningBrush}" Padding="15,8"
-                        IsVisible="{Binding ShowAssignInspectionButton}">
-                    Назначить проверку
-                </Button>
+                <Border
+                    Grid.Row="1"
+                    Margin="0,0,0,20"
+                    Padding="15"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <StackPanel>
 
-                <!-- После получения ответа от инспектора -->
-                <StackPanel IsVisible="{Binding ShowInspectionResponse}">
-                    <TextBlock Text="{Binding InspectionResponseText}" FontSize="12" Foreground="{StaticResource WarningBrush}"
-                               TextWrapping="Wrap" Margin="0,0,0,10"/>
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Command="{Binding MarkAsFalseCommand}" 
-                                Background="{StaticResource DangerBrush}" Padding="15,8">Ложные показания</Button>
-                        <Button Command="{Binding RequestRepairCommand}" 
-                                Background="{StaticResource WarningBrush}" Padding="15,8">Требуется ремонт</Button>
+                        <TextBlock
+                            Margin="0,0,0,15"
+                            FontSize="16"
+                            FontWeight="Bold"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Text="📊 История трубопровода" />
+
+                        <TextBlock
+                            Margin="0,30,0,30"
+                            HorizontalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{StaticResource TextMutedBrush}"
+                            IsVisible="{Binding IsLoadingHistory}"
+                            Text="⏳ Загрузка истории..." />
+
+                        <Border MinHeight="150" IsVisible="{Binding !IsLoadingHistory}">
+
+                            <Canvas
+                                x:Name="TimelineCanvas"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Background="Transparent"
+                                SizeChanged="OnTimelineCanvasSizeChanged" />
+
+                        </Border>
+
+                        <Border
+                            Margin="0,15,0,0"
+                            Padding="12"
+                            Background="{StaticResource WarningBackgroundBrush}"
+                            BorderBrush="{StaticResource WarningBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            IsVisible="{Binding HasSelectedEvent}">
+                            <StackPanel>
+                                <TextBlock
+                                    Margin="0,0,0,5"
+                                    FontSize="12"
+                                    FontWeight="Bold"
+                                    Foreground="{StaticResource WarningBrush}"
+                                    Text="ℹ️ Информация о событии" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    Text="{Binding SelectedEventDetails}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
-                </StackPanel>
+                </Border>
+
+                <Border
+                    Grid.Row="2"
+                    Margin="0,0,0,10"
+                    Padding="15"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    IsVisible="{Binding CanTakeAction}">
+                    <StackPanel Spacing="10">
+
+                        <TextBlock
+                            Margin="0,0,0,5"
+                            FontSize="16"
+                            FontWeight="Bold"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Text="⚡ Действия" />
+
+                        <Button
+                            Height="40"
+                            Background="{StaticResource AccentBrush}"
+                            Command="{Binding AssignInspectionCommand}">
+                            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                                <TextBlock VerticalAlignment="Center" Text="🔍 " />
+                                <TextBlock VerticalAlignment="Center" Text="Назначить проверку" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button
+                            Height="40"
+                            Background="{StaticResource WarningBrush}"
+                            Command="{Binding MarkAsFalseCommand}">
+                            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                                <TextBlock VerticalAlignment="Center" Text="⚠️ " />
+                                <TextBlock VerticalAlignment="Center" Text="Ложные показания" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button
+                            Height="40"
+                            Background="{StaticResource DangerBrush}"
+                            Command="{Binding RequestRepairCommand}">
+                            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                                <TextBlock VerticalAlignment="Center" Text="🔧 " />
+                                <TextBlock VerticalAlignment="Center" Text="Требуется ремонт" />
+                            </StackPanel>
+                        </Button>
+
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+        </ScrollViewer>
+
+        <Border
+            Grid.Row="2"
+            Height="55"
+            Background="{StaticResource CardBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,1,0,0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Button
+                    Padding="30,8"
+                    Background="Transparent"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    Command="{Binding CloseCommand}"
+                    Foreground="{StaticResource TextSecondaryBrush}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Text="✕ " />
+                        <TextBlock VerticalAlignment="Center" Text="Закрыть" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Border>
-
-        <!-- История изменений -->
-        <Border Grid.Row="2" Classes="card">
-            <StackPanel>
-                <TextBlock Text="История изменений статуса" Classes="h3" Margin="0,0,0,10"/>
-                <ItemsControl ItemsSource="{Binding StatusHistory}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border CornerRadius="5" Padding="8" Margin="0,0,0,3">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" FontSize="11"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" Margin="10,0,0,0"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
-
-        <!-- Кнопка закрытия -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
-            <Button Command="{Binding CloseCommand}" Background="{StaticResource TextMutedBrush}" Padding="20,8">Закрыть</Button>
-        </StackPanel>
 
     </Grid>
 </Window>

@@ -232,39 +232,41 @@ public class DatabaseService
     {
         var problems = new ObservableCollection<Problem>();
         const string query = @"
-            SELECT
-                up.Код_уведом_проб,
-                COALESCE(tp.Наименование, 'Неизвестный тип') as Тип_проблемы,
-                COALESCE(up.Описание, 'Нет описания') as Описание,
-                up.Дата_уведомления,
-                COALESCE(up.Время_уведомления, '00:00:00'::time) as Время_уведомления,
-                COALESCE(t.Код_трубопровода, 0) as Код_трубопровода,
-                COALESCE(t.Наименование, 'Неизвестный трубопровод') as Трубопровод,
-                COALESCE(z.Текущее_значение, 0) as Текущее_значение,
-                COALESCE(rd.Максимальное_значение, 0) as Максимальное_значение,
-                COALESCE(tp.Категория_риска, 'Средний') as Категория_риска,
-                CASE
-                    WHEN p.Код_проверки IS NULL THEN 'Новая'
-                    WHEN st.Код_статуса_проверки = 6 THEN 'Завершена'
-                    WHEN st.Код_статуса_проверки = 7 THEN 'Отложена'
-                    WHEN st.Код_статуса_проверки = 8 THEN 'Отменена'
-                    WHEN st.Код_статуса_проверки = 4 THEN 'Ожидает подтверждения'
-                    WHEN st.Код_статуса_проверки = 2 THEN 'В процессе выполнения'
-                    ELSE COALESCE(st.Наименование, 'В работе')
-                END as Статус
-            FROM Уведомление_проблемы up
-            LEFT JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
-            LEFT JOIN Замер z ON up.Код_замера = z.Код_замера
-            LEFT JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
-            LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
-            LEFT JOIN Датчик d ON dt.Код_датчика = d.Код_датчика
-            LEFT JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
-            LEFT JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
-            LEFT JOIN Проверка p ON up.Код_уведом_проб = p.Код_уведом_проб
-            LEFT JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
-            WHERE up.Дата_уведомления IS NOT NULL
-            AND (p.Код_проверки IS NULL OR st.Код_статуса_проверки NOT IN (6, 7, 8))
-            ORDER BY up.Дата_уведомления DESC, up.Время_уведомления DESC";
+        SELECT DISTINCT
+            up.Код_уведом_проб,
+            COALESCE(tp.Наименование, 'Неизвестный тип') as Тип_проблемы,
+            COALESCE(up.Описание, 'Нет описания') as Описание,
+            up.Дата_уведомления,
+            COALESCE(up.Время_уведомления, '00:00:00'::time) as Время_уведомления,
+            COALESCE(t.Код_трубопровода, 0) as Код_трубопровода,
+            COALESCE(t.Наименование, 'Неизвестный трубопровод') as Трубопровод,
+            COALESCE(z.Текущее_значение, 0) as Текущее_значение,
+            COALESCE(rd.Максимальное_значение, 0) as Максимальное_значение,
+            COALESCE(tp.Категория_риска, 'Средний') as Категория_риска,
+            CASE
+                WHEN p.Код_проверки IS NULL THEN 'Новая'
+                WHEN st.Код_статуса_проверки = 6 THEN 'Завершена'
+                WHEN st.Код_статуса_проверки = 7 THEN 'Отложена'
+                WHEN st.Код_статуса_проверки = 8 THEN 'Отменена'
+                WHEN st.Код_статуса_проверки = 4 THEN 'Ожидает подтверждения'
+                WHEN st.Код_статуса_проверки = 2 THEN 'В процессе выполнения'
+                ELSE COALESCE(st.Наименование, 'В работе')
+            END as Статус,
+            up.Дата_уведомления as SortDate,
+            up.Время_уведомления as SortTime
+        FROM Уведомление_проблемы up
+        LEFT JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+        LEFT JOIN Замер z ON up.Код_замера = z.Код_замера
+        LEFT JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        LEFT JOIN Датчик d ON dt.Код_датчика = d.Код_датчика
+        LEFT JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        LEFT JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        LEFT JOIN Проверка p ON up.Код_уведом_проб = p.Код_уведом_проб
+        LEFT JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+        WHERE up.Дата_уведомления IS NOT NULL
+        AND (p.Код_проверки IS NULL OR st.Код_статуса_проверки NOT IN (6, 7, 8))
+        ORDER BY SortDate DESC, SortTime DESC";
 
         try
         {
@@ -273,7 +275,7 @@ public class DatabaseService
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                problems.Add(new Problem
+                var problem = new Problem
                 {
                     Id = reader.GetInt32(0),
                     Type = reader.GetString(1),
@@ -286,7 +288,8 @@ public class DatabaseService
                     ThresholdValue = reader.GetDecimal(8),
                     RiskCategory = reader.GetString(9),
                     Status = reader.GetString(10)
-                });
+                };
+                problems.Add(problem);
             }
         }
         catch (Exception ex)
@@ -294,6 +297,126 @@ public class DatabaseService
             Console.WriteLine($"GetActiveProblemsAsync error: {ex.Message}");
         }
         return problems;
+    }
+    
+    // НОВЫЙ МЕТОД: Получение истории проблемы (линия жизни)
+    public async Task<ObservableCollection<ProblemHistoryEvent>> GetProblemHistoryAsync(int problemId)
+    {
+        var history = new ObservableCollection<ProblemHistoryEvent>();
+
+        const string query = @"
+            -- Обнаружение проблемы
+            SELECT 
+                'Проблема обнаружена' as Событие,
+                up.Дата_уведомления as Дата,
+                up.Время_уведомления as Время,
+                up.Описание as Детали,
+                1 as Порядок
+            FROM Уведомление_проблемы up
+            WHERE up.Код_уведом_проб = @problemId
+            
+            UNION ALL
+            
+            -- Назначение проверки
+            SELECT 
+                'Назначена проверка' as Событие,
+                p.Дата_начала as Дата,
+                NULL as Время,
+                CONCAT('Проверка: ', COALESCE(p.Описание, 'Нет описания'), 
+                       '. Ответственный: ', COALESCE(s.Фамилия, ''), ' ', COALESCE(s.Имя, '')) as Детали,
+                2 as Порядок
+            FROM Проверка p
+            LEFT JOIN Сотрудник s ON p.Код_сотр = s.Код_сотр
+            WHERE p.Код_уведом_проб = @problemId
+            
+            UNION ALL
+            
+            -- Статусы проверки
+            SELECT 
+                CONCAT('Статус проверки: ', st.Наименование) as Событие,
+                COALESCE(p.Дата_окончания, p.Дата_начала) as Дата,
+                NULL as Время,
+                COALESCE(p.Описание, 'Нет дополнительной информации') as Детали,
+                3 as Порядок
+            FROM Проверка p
+            JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+            WHERE p.Код_уведом_проб = @problemId
+            
+            UNION ALL
+            
+            -- Ремонт (если был)
+            SELECT 
+                CONCAT('Ремонт: ', sr.Наименование) as Событие,
+                r.Дата_начала as Дата,
+                NULL as Время,
+                CONCAT('Бригада: ', b.Наименование, '. Бюджет: ', r.Бюджет, ' руб.') as Детали,
+                4 as Порядок
+            FROM Ремонт r
+            JOIN Проверка p ON r.Код_проверки = p.Код_проверки
+            JOIN Статус_ремонта sr ON r.Код_статуса_ремонта = sr.Код_статуса_ремонта
+            JOIN Бригада_сотрудник bs ON r.Код_бриг_сотр = bs.Код_бриг_сотр
+            JOIN Бригада b ON bs.Код_бриг = b.Код_бриг
+            WHERE p.Код_уведом_проб = @problemId
+            
+            UNION ALL
+            
+            -- Завершение/отмена
+            SELECT 
+                CASE 
+                    WHEN st.Код_статуса_проверки = 6 THEN 'Ремонт завершен'
+                    WHEN st.Код_статуса_проверки = 7 THEN 'Проверка отложена'
+                    WHEN st.Код_статуса_проверки = 8 THEN 'Проверка отменена'
+                    ELSE 'Проблема закрыта'
+                END as Событие,
+                COALESCE(p.Дата_окончания, CURRENT_DATE) as Дата,
+                NULL as Время,
+                'Проблема закрыта' as Детали,
+                5 as Порядок
+            FROM Проверка p
+            JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+            WHERE p.Код_уведом_проб = @problemId
+            AND st.Код_статуса_проверки IN (6, 7, 8)
+            
+            ORDER BY Дата ASC, Порядок ASC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@problemId", problemId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                var eventDate = reader.GetDateTime(1);
+                var eventTime = reader.IsDBNull(2) ? TimeSpan.Zero : reader.GetTimeSpan(2);
+
+                history.Add(new ProblemHistoryEvent
+                {
+                    Id = history.Count + 1,
+                    EventName = reader.GetString(0),
+                    EventDate = eventDate,
+                    EventTime = eventTime,
+                    Details = reader.GetString(3),
+                    EventType = GetEventType(reader.GetString(0))
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetProblemHistoryAsync error: {ex.Message}");
+        }
+
+        return history;
+    }
+
+    private string GetEventType(string eventName)
+    {
+        if (eventName.Contains("обнаружена")) return "detection";
+        if (eventName.Contains("проверк")) return "inspection";
+        if (eventName.Contains("Ремонт")) return "repair";
+        if (eventName.Contains("завершен") || eventName.Contains("отмен") || eventName.Contains("отлож")) return "completion";
+        return "default";
     }
 
     public async Task<ObservableCollection<Problem>> GetAllProblemsAsync()
@@ -549,6 +672,7 @@ public class DatabaseService
                 WHEN @status = 'Отложена' THEN 7
                 WHEN @status = 'Отменена' THEN 8
                 WHEN @status = 'Ложные показания' THEN 6
+                WHEN @status = 'Запланирована проверка' THEN 1
                 ELSE 1
             END,
             Дата_окончания = CASE WHEN @status IN ('Завершена', 'Ложные показания', 'Отменена') THEN CURRENT_DATE ELSE NULL END
@@ -1772,5 +1896,4 @@ public class DatabaseService
         }
         return null;
     }
-
 }

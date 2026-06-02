@@ -1,57 +1,170 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Taneco.ViewModels"
-             x:Class="Taneco.Views.ProblemsView"
-             x:DataType="vm:ProblemsViewModel">
+<UserControl
+    x:Class="Taneco.Views.ProblemsView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    x:DataType="vm:ProblemsViewModel">
 
     <ScrollViewer>
         <StackPanel Margin="15">
 
-            <TextBlock Text="Управление проблемами" Classes="h1" Margin="0,0,0,15"/>
+            <TextBlock
+                Margin="0,0,0,15"
+                Classes="h1"
+                Text="Управление проблемами" />
 
-            <Border Classes="card" Margin="0,0,0,15">
+            <Border Margin="0,0,0,15" Classes="card">
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Button Command="{Binding RefreshCommand}" Padding="15,8">Обновить</Button>
-                    <Button Command="{Binding CreateProblemCommand}" IsVisible="{Binding CanCreateProblem}" Padding="15,8">Новая проблема</Button>
+                    <Button
+                        Padding="15,8"
+                        Command="{Binding RefreshCommand}"
+                        IsEnabled="{Binding !IsLoading}">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock Text="{Binding RefreshButtonText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Padding="15,8"
+                        Command="{Binding CreateProblemCommand}"
+                        IsVisible="{Binding CanCreateProblem}">
+                        Новая проблема
+                    </Button>
 
-                    <TextBlock Text="Статус:" VerticalAlignment="Center" Margin="20,0,5,0"/>
-                    <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" Width="140"/>
+                    <TextBlock
+                        Margin="20,0,5,0"
+                        VerticalAlignment="Center"
+                        Text="Статус:" />
+                    <ComboBox
+                        Width="180"
+                        ItemsSource="{Binding StatusFilters}"
+                        SelectedItem="{Binding SelectedStatusFilter}" />
 
-                    <TextBlock Text="Тип:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                    <ComboBox ItemsSource="{Binding TypeFilters}" SelectedItem="{Binding SelectedTypeFilter}" Width="150"/>
+                    <TextBlock
+                        Margin="10,0,5,0"
+                        VerticalAlignment="Center"
+                        Text="Тип:" />
+                    <ComboBox
+                        Width="220"
+                        ItemsSource="{Binding TypeFilters}"
+                        SelectedItem="{Binding SelectedTypeFilter}" />
+
+                    <TextBlock
+                        Margin="10,0,5,0"
+                        VerticalAlignment="Center"
+                        Text="Поиск:" />
+                    <TextBox
+                        Width="200"
+                        Text="{Binding SearchText, Mode=TwoWay}"
+                        Watermark="Поиск по описанию..." />
                 </StackPanel>
             </Border>
 
-            <!-- Список проблем -->
+            <!--  Прогресс-бар загрузки  -->
+            <Border Margin="0,0,0,10" IsVisible="{Binding IsLoading}">
+                <ProgressBar Height="4" IsIndeterminate="True" />
+            </Border>
+
+            <!--  Список проблем  -->
             <ItemsControl ItemsSource="{Binding FilteredProblems}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Classes="card" Margin="0,0,0,8">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button
+                            Margin="0,0,0,8"
+                            Padding="0"
+                            HorizontalAlignment="Stretch"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Click="OnProblemClick"
+                            Tag="{Binding}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover">
+                                    <Setter Property="Opacity" Value="0.9" />
+                                </Style>
+                            </Button.Styles>
+                            <Border Classes="card">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
 
-                                <Border Grid.Column="0" Background="{Binding StatusColor}" CornerRadius="5" Width="4" Height="30" Margin="0,0,10,0"/>
+                                    <!--  Цветная полоса статуса  -->
+                                    <Border
+                                        Grid.Column="0"
+                                        Width="4"
+                                        Margin="0,0,10,0"
+                                        Background="{Binding StatusColor}"
+                                        CornerRadius="2" />
 
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="{Binding PipelineName}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
-                                    <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding Type}" FontSize="11" Foreground="{StaticResource WarningBrush}" Margin="0,5,0,0"/>
-                                </StackPanel>
+                                    <!--  Основная информация  -->
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock
+                                            FontSize="13"
+                                            FontWeight="Bold"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding PipelineName}" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="{Binding Description}"
+                                            TextWrapping="Wrap" />
+                                        <StackPanel
+                                            Margin="0,5,0,0"
+                                            Orientation="Horizontal"
+                                            Spacing="10">
+                                            <TextBlock
+                                                FontSize="11"
+                                                Foreground="{StaticResource WarningBrush}"
+                                                Text="{Binding Type}" />
+                                            <Border
+                                                Padding="4,2"
+                                                Background="{Binding RiskColor}"
+                                                CornerRadius="4">
+                                                <TextBlock
+                                                    FontSize="10"
+                                                    Foreground="White"
+                                                    Text="{Binding RiskCategory}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
 
-                                <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0">
-                                    <TextBlock Text="{Binding NotificationDate, StringFormat='dd.MM.yyyy'}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
-                                    <TextBlock Text="{Binding NotificationTime}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
-                                    <Border Background="{Binding StatusColor}" CornerRadius="10" Padding="8,3" Margin="0,5,0,0">
-                                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                                    </Border>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+                                    <!--  Правая панель  -->
+                                    <StackPanel
+                                        Grid.Column="2"
+                                        Margin="10,0,0,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                        <TextBlock
+                                            HorizontalAlignment="Right"
+                                            FontSize="11"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="{Binding NotificationDate, StringFormat='dd.MM.yyyy'}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Right"
+                                            FontSize="11"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="{Binding NotificationTime}" />
+                                        <Border
+                                            Margin="0,5,0,0"
+                                            Padding="8,3"
+                                            Background="{Binding StatusColor}"
+                                            CornerRadius="10">
+                                            <TextBlock
+                                                HorizontalAlignment="Center"
+                                                FontSize="10"
+                                                FontWeight="SemiBold"
+                                                Foreground="White"
+                                                Text="{Binding Status}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock Text="{Binding FilteredProblems.Count, StringFormat='Всего проблем: {0}'}"
-                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+            <TextBlock
+                Margin="0,10,0,0"
+                FontSize="11"
+                Foreground="{StaticResource TextMutedBrush}"
+                Text="{Binding FilteredProblems.Count, StringFormat='Всего проблем: {0}'}" />
 
         </StackPanel>
     </ScrollViewer>
