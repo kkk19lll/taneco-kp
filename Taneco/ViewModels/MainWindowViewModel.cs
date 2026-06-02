@@ -23,6 +23,7 @@ public class MainWindowViewModel : ViewModelBase
         ShowRepairsCommand = new RelayCommand(_ => ShowRepairs());
         ShowStaffCommand = new RelayCommand(_ => ShowStaff());
         ShowReportsCommand = new RelayCommand(_ => ShowReports());
+        ShowEquipmentManagementCommand = new RelayCommand(_ => ShowEquipmentManagement());
         LogoutCommand = new RelayCommand(_ => Environment.Exit(0));
 
         // Показываем главный экран
@@ -56,6 +57,7 @@ public class MainWindowViewModel : ViewModelBase
     public bool CanManageStaff => CurrentUser?.CanManageStaff ?? false;
     public bool CanViewReports => CurrentUser?.CanViewReports ?? false;
     public bool IsAdmin => CurrentUser?.IsAdmin ?? false;
+    public bool CanManageEquipment => CurrentUser?.CanManageEquipment ?? false;
 
     public ICommand ShowMonitoringCommand { get; }
     public ICommand ShowEquipmentsCommand { get; }
@@ -66,6 +68,7 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand ShowReportsCommand { get; }
     public ICommand ShowAdminCommand { get; }
     public ICommand LogoutCommand { get; }
+    public ICommand ShowEquipmentManagementCommand { get; }
 
     private void ShowMonitoring()
     {
@@ -135,5 +138,15 @@ public class MainWindowViewModel : ViewModelBase
         view.DataContext = viewModel;
         CurrentView = view;
         CurrentTitle = "Отчеты";
+    }
+
+    private void ShowEquipmentManagement()
+    {
+        var view = new EquipmentManagementView();
+        var viewModel = new EquipmentManagementViewModel();
+        viewModel.CurrentUser = CurrentUser;
+        view.DataContext = viewModel;
+        CurrentView = view;
+        CurrentTitle = "Оборудование";
     }
 }

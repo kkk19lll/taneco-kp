@@ -1,0 +1,166 @@
+<UserControl
+    x:Class="Taneco.Views.EquipmentManagementView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="clr-namespace:Taneco.ViewModels"
+    x:DataType="viewModels:EquipmentManagementViewModel">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="350" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!--  Левая панель  -->
+        <Grid Grid.Column="0" RowDefinitions="Auto, *">
+            <!--  Кнопка обновить список на всю ширину внизу  -->
+            <Button
+                Margin="10"
+                HorizontalAlignment="Stretch"
+                Command="{Binding RefreshEquipmentListCommand}"
+                Content="⟳ Обновить список"
+                DockPanel.Dock="Bottom" />
+
+            <!--  Контент левой панели  -->
+            <Border Grid.Row="1" Background="{DynamicResource RegionColor}">
+                <DockPanel>
+                    <!--  Поиск  -->
+                    <StackPanel Margin="10" DockPanel.Dock="Top">
+                        <TextBox
+                            Text="{Binding SearchText}"
+                            TextChanged="SearchBox_OnTextChanged"
+                            Watermark="Поиск по наименованию модели, производителя или типа..." />
+                    </StackPanel>
+
+                    <!--  Список оборудования  -->
+                    <ScrollViewer>
+                        <ListBox
+                            Margin="10"
+                            ItemsSource="{Binding EquipmentList}"
+                            SelectedItem="{Binding SelectedEquipment}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,2" Padding="8">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="Bold" Text="{Binding Model}" />
+                                            <TextBlock
+                                                FontSize="11"
+                                                Opacity="0.7"
+                                                Text="{Binding Manufacturer}" />
+                                            <TextBlock
+                                                FontSize="11"
+                                                Opacity="0.6"
+                                                Text="{Binding Type}" />
+                                            <TextBlock
+                                                FontSize="10"
+                                                Opacity="0.5"
+                                                Text="{Binding InstallationLocation}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!--  Разделитель  -->
+        <GridSplitter
+            Grid.Column="1"
+            Width="4"
+            Background="{DynamicResource ThemeControlHighlightMidBrush}" />
+
+        <!--  Правая панель  -->
+        <Border Grid.Column="2" Background="{DynamicResource ThemeControlBackgroundBrush}">
+            <Grid>
+                <ScrollViewer IsVisible="{Binding ShowDetailsPanel}">
+                    <StackPanel Margin="15">
+                        <TextBlock
+                            Margin="0,0,0,15"
+                            FontSize="16"
+                            FontWeight="Bold"
+                            Text="Детальная информация об оборудовании" />
+
+                        <Border
+                            Padding="15"
+                            Background="{DynamicResource RegionColor}"
+                            CornerRadius="8">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Модель:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Model}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Производитель:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Manufacturer}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Страна:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ManufacturerCountry}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Тип:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Type}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Точка контроля:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ControlPoint}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Тип измерения:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.MeasurementType}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Ед. измерения:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Unit}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Диапазон:" />
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="5">
+                                        <TextBlock Text="{Binding SelectedEquipmentDetails.MinValue}" />
+                                        <TextBlock Text="-" />
+                                        <TextBlock Text="{Binding SelectedEquipmentDetails.MaxValue}" />
+                                        <TextBlock Text="{Binding SelectedEquipmentDetails.Unit}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Трубопровод:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.PipelineName}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Местоположение:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.InstallationLocation}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Год выпуска:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.ProductionYear}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock FontWeight="Bold" Text="Последняя поверка:" />
+                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.LastCalibration, StringFormat={}{0:dd.MM.yyyy}}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Border
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding !ShowDetailsPanel}">
+                    <TextBlock
+                        MaxWidth="300"
+                        Opacity="0.5"
+                        Text="Выберите оборудование из списка слева для просмотра детальной информации"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -94,6 +94,18 @@
 
                 <Button
                     Classes="menu-item"
+                    Command="{Binding ShowEquipmentManagementCommand}"
+                    IsVisible="{Binding CanManageEquipment}">
+                    <StackPanel Margin="10,0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            FontSize="13"
+                            Text="Оборудование" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Classes="menu-item"
                     Command="{Binding ShowProblemsCommand}"
                     IsVisible="{Binding CanManageProblems}">
                     <StackPanel Margin="10,0" Orientation="Horizontal">

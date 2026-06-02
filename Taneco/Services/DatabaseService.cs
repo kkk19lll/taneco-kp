@@ -1573,4 +1573,204 @@ public class DatabaseService
             return false;
         }
     }
+
+    public async Task<ObservableCollection<Equipment>> GetAllEquipmentAsync()
+    {
+        var equipment = new ObservableCollection<Equipment>();
+        const string query = @"
+        SELECT
+            d.Код_датчика,
+            m.Наименование as Модель,
+            p.Наименование as Производитель,
+            td.Наименование as Тип,
+            COALESCE(dt.Местоположение, 'Не указано') as Местоположение,
+            p.Страна,
+            d.Точка_контроля,
+            COALESCE(t.Наименование, 'Не установлен') as Трубопровод,
+            d.Год_выпуска,
+            d.Дата_последней_поверки,
+            rd.Минимальное_значение,
+            rd.Максимальное_значение,
+            ei.Наименование as Единица_измерения,
+            dim.Наименование as Измерение
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        JOIN Производитель p ON m.Код_производ = p.Код_производ
+        JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+        JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        JOIN Особенности_измерения oi ON d.Код_особ_измер_дат = oi.Код_особ_измер_дат
+        JOIN Единица_измерения ei ON oi.Код_ед_измер = ei.Код_ед_измер
+        JOIN Измерение_датчика dim ON oi.Код_измер_дат = dim.Код_измер_дат
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        ORDER BY d.Код_датчика";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                equipment.Add(new Equipment
+                {
+                    Id = reader.GetInt32(0),
+                    Model = reader.GetString(1),
+                    Manufacturer = reader.GetString(2),
+                    Type = reader.GetString(3),
+                    InstallationLocation = reader.GetString(4),
+                    ManufacturerCountry = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    ControlPoint = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    PipelineName = reader.GetString(7),
+                    ProductionYear = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                    LastCalibration = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
+                    MinValue = reader.GetDecimal(10),
+                    MaxValue = reader.GetDecimal(11),
+                    Unit = reader.IsDBNull(12) ? null : reader.GetString(12),
+                    MeasurementType = reader.IsDBNull(13) ? null : reader.GetString(13)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetAllEquipmentAsync error: {ex.Message}");
+        }
+        return equipment;
+    }
+
+    public async Task<ObservableCollection<Equipment>> SearchEquipmentByNameAsync(string searchTerm)
+    {
+        var equipment = new ObservableCollection<Equipment>();
+        const string query = @"
+        SELECT
+            d.Код_датчика,
+            m.Наименование as Модель,
+            p.Наименование as Производитель,
+            td.Наименование as Тип,
+            COALESCE(dt.Местоположение, 'Не указано') as Местоположение,
+            p.Страна,
+            d.Точка_контроля,
+            COALESCE(t.Наименование, 'Не установлен') as Трубопровод,
+            d.Год_выпуска,
+            d.Дата_последней_поверки,
+            rd.Минимальное_значение,
+            rd.Максимальное_значение,
+            ei.Наименование as Единица_измерения,
+            dim.Наименование as Измерение
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        JOIN Производитель p ON m.Код_производ = p.Код_производ
+        JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+        JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        JOIN Особенности_измерения oi ON d.Код_особ_измер_дат = oi.Код_особ_измер_дат
+        JOIN Единица_измерения ei ON oi.Код_ед_измер = ei.Код_ед_измер
+        JOIN Измерение_датчика dim ON oi.Код_измер_дат = dim.Код_измер_дат
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        WHERE m.Наименование ILIKE @search 
+           OR p.Наименование ILIKE @search
+           OR td.Наименование ILIKE @search
+        ORDER BY d.Код_датчика";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@search", $"%{searchTerm}%");
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                equipment.Add(new Equipment
+                {
+                    Id = reader.GetInt32(0),
+                    Model = reader.GetString(1),
+                    Manufacturer = reader.GetString(2),
+                    Type = reader.GetString(3),
+                    InstallationLocation = reader.GetString(4),
+                    ManufacturerCountry = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    ControlPoint = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    PipelineName = reader.GetString(7),
+                    ProductionYear = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                    LastCalibration = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
+                    MinValue = reader.GetDecimal(10),
+                    MaxValue = reader.GetDecimal(11),
+                    Unit = reader.IsDBNull(12) ? null : reader.GetString(12),
+                    MeasurementType = reader.IsDBNull(13) ? null : reader.GetString(13)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SearchEquipmentByNameAsync error: {ex.Message}");
+        }
+        return equipment;
+    }
+
+    public async Task<Equipment?> GetEquipmentDetailsAsync(int equipmentId)
+    {
+        const string query = @"
+        SELECT
+            d.Код_датчика,
+            m.Наименование as Модель,
+            p.Наименование as Производитель,
+            td.Наименование as Тип,
+            COALESCE(dt.Местоположение, 'Не указано') as Местоположение,
+            p.Страна,
+            d.Точка_контроля,
+            COALESCE(t.Наименование, 'Не установлен') as Трубопровод,
+            d.Год_выпуска,
+            d.Дата_последней_поверки,
+            rd.Минимальное_значение,
+            rd.Максимальное_значение,
+            ei.Наименование as Единица_измерения,
+            dim.Наименование as Измерение
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        JOIN Производитель p ON m.Код_производ = p.Код_производ
+        JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+        JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        JOIN Особенности_измерения oi ON d.Код_особ_измер_дат = oi.Код_особ_измер_дат
+        JOIN Единица_измерения ei ON oi.Код_ед_измер = ei.Код_ед_измер
+        JOIN Измерение_датчика dim ON oi.Код_измер_дат = dim.Код_измер_дат
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        WHERE d.Код_датчика = @equipmentId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@equipmentId", equipmentId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return new Equipment
+                {
+                    Id = reader.GetInt32(0),
+                    Model = reader.GetString(1),
+                    Manufacturer = reader.GetString(2),
+                    Type = reader.GetString(3),
+                    InstallationLocation = reader.GetString(4),
+                    ManufacturerCountry = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    ControlPoint = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    PipelineName = reader.GetString(7),
+                    ProductionYear = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                    LastCalibration = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
+                    MinValue = reader.GetDecimal(10),
+                    MaxValue = reader.GetDecimal(11),
+                    Unit = reader.IsDBNull(12) ? null : reader.GetString(12),
+                    MeasurementType = reader.IsDBNull(13) ? null : reader.GetString(13)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetEquipmentDetailsAsync error: {ex.Message}");
+        }
+        return null;
+    }
+
 }
