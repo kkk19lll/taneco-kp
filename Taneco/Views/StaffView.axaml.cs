@@ -1,6 +1,5 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
+using Taneco.ViewModels;
 
 namespace Taneco.Views;
 

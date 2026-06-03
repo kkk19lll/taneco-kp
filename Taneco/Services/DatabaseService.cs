@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Npgsql;
 using Taneco.Models;
@@ -14,6 +15,57 @@ public class DatabaseService
     public DatabaseService()
     {
         _connectionString = "Host=localhost;Port=5432;Database=kp;Username=postgres;Password=123;";
+    }
+
+    // Метод для проверки наличия запрещенных символов в пароле
+    public static bool IsPasswordValid(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+            return false;
+
+        // 1. Проверка длины (минимум 8 символов)
+        if (password.Length < 8)
+            return false;
+
+        // 2. Запрещенные символы: *, #, ₽, &
+        string forbiddenChars = @"\*#₽&";
+        if (Regex.IsMatch(password, $"[{forbiddenChars}]"))
+            return false;
+
+        // 3. Проверка наличия хотя бы одной цифры
+        if (!Regex.IsMatch(password, @"\d"))
+            return false;
+
+        // 4. Проверка наличия хотя бы одной заглавной буквы
+        if (!Regex.IsMatch(password, @"[A-ZА-Я]"))
+            return false;
+
+        // 5. Проверка наличия хотя бы одной строчной буквы
+        if (!Regex.IsMatch(password, @"[a-zа-я]"))
+            return false;
+
+        return true;
+    }
+
+    // Метод для получения сообщения об ошибке валидации пароля
+    public static string GetPasswordErrorMessage()
+    {
+        return "Пароль должен содержать минимум 8 символов, включая:\n" +
+               "• Заглавную букву (A-Z, А-Я)\n" +
+               "• Строчную букву (a-z, а-я)\n" +
+               "• Цифру (0-9)\n" +
+               "Пароль НЕ должен содержать символы: *, #, ₽, &";
+    }
+
+    // Метод для проверки даты приема
+    public static bool IsHireDateValid(DateTime hireDate)
+    {
+        return hireDate.Date <= DateTime.Today;
+    }
+
+    public static string GetHireDateErrorMessage()
+    {
+        return "Дата приема не может быть в будущем";
     }
 
     private async Task<NpgsqlConnection> GetConnectionAsync()
@@ -298,7 +350,7 @@ public class DatabaseService
         }
         return problems;
     }
-    
+
     // НОВЫЙ МЕТОД: Получение истории проблемы (линия жизни)
     public async Task<ObservableCollection<ProblemHistoryEvent>> GetProblemHistoryAsync(int problemId)
     {
@@ -970,7 +1022,6 @@ public class DatabaseService
             JOIN Отдел o ON s.Код_отдела = o.Код_отдела
             JOIN Должность d ON s.Код_должности = d.Код_должности
             LEFT JOIN Авторизация_сотрудник a ON s.Код_сотр = a.Код_сотр
-            WHERE s.Активен = true
             ORDER BY s.Фамилия";
 
         try
@@ -996,8 +1047,9 @@ public class DatabaseService
                 });
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"GetEmployeesAsync error: {ex.Message}");
         }
         return employees;
     }
@@ -1048,7 +1100,7 @@ public class DatabaseService
     }
 
     public async Task<bool> AddEmployeeAsync(string lastName, string firstName, string patronymic, string phone,
-        string department, string position, string role, string login, string password)
+        string department, string position, string role, string login, string password, DateTime hireDate)
     {
         try
         {
@@ -1079,7 +1131,7 @@ public class DatabaseService
 
             const string insertEmployee = @"
                 INSERT INTO Сотрудник (Код_сотр, Фамилия, Имя, Отчество, Контактная_информация, Код_отдела, Код_должности, Дата_приема, Активен)
-                VALUES (@id, @lastName, @firstName, @patronymic, @phone, @departmentId, @positionId, CURRENT_DATE, true)";
+                VALUES (@id, @lastName, @firstName, @patronymic, @phone, @departmentId, @positionId, @hireDate, true)";
 
             await using (var cmd = new NpgsqlCommand(insertEmployee, conn))
             {
@@ -1090,6 +1142,7 @@ public class DatabaseService
                 cmd.Parameters.AddWithValue("@phone", string.IsNullOrEmpty(phone) ? "" : phone);
                 cmd.Parameters.AddWithValue("@departmentId", departmentId);
                 cmd.Parameters.AddWithValue("@positionId", positionId);
+                cmd.Parameters.AddWithValue("@hireDate", hireDate);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -1114,14 +1167,15 @@ public class DatabaseService
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"AddEmployeeAsync error: {ex.Message}");
             return false;
         }
     }
 
     public async Task<bool> UpdateEmployeeAsync(int id, string lastName, string firstName, string patronymic, string phone,
-        string department, string position, string role, string login, string password)
+        string department, string position, string role, string login, string password, DateTime hireDate)
     {
         try
         {
@@ -1149,7 +1203,8 @@ public class DatabaseService
                 SET Фамилия = @lastName, Имя = @firstName, Отчество = @patronymic,
                     Контактная_информация = @phone,
                     Код_отдела = @departmentId,
-                    Код_должности = @positionId
+                    Код_должности = @positionId,
+                    Дата_приема = @hireDate
                 WHERE Код_сотр = @id";
 
             await using (var cmd = new NpgsqlCommand(updateEmployee, conn))
@@ -1161,6 +1216,7 @@ public class DatabaseService
                 cmd.Parameters.AddWithValue("@phone", string.IsNullOrEmpty(phone) ? "" : phone);
                 cmd.Parameters.AddWithValue("@departmentId", departmentId);
                 cmd.Parameters.AddWithValue("@positionId", positionId);
+                cmd.Parameters.AddWithValue("@hireDate", hireDate);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -1194,8 +1250,9 @@ public class DatabaseService
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"UpdateEmployeeAsync error: {ex.Message}");
             return false;
         }
     }
@@ -1210,8 +1267,9 @@ public class DatabaseService
             cmd.Parameters.AddWithValue("@id", id);
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"DeleteEmployeeAsync error: {ex.Message}");
             return false;
         }
     }
@@ -1227,8 +1285,9 @@ public class DatabaseService
             cmd.Parameters.AddWithValue("@password", newPassword);
             return await cmd.ExecuteNonQueryAsync() > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"ResetPasswordAsync error: {ex.Message}");
             return false;
         }
     }
@@ -1895,5 +1954,63 @@ public class DatabaseService
             Console.WriteLine($"GetEquipmentDetailsAsync error: {ex.Message}");
         }
         return null;
+    }
+
+    // НОВЫЙ МЕТОД: Получение доступных отделов
+    public async Task<List<string>> GetDepartmentsAsync()
+    {
+        var departments = new List<string>();
+        const string query = "SELECT Наименование FROM Отдел ORDER BY Наименование";
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                departments.Add(reader.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetDepartmentsAsync error: {ex.Message}");
+        }
+        return departments;
+    }
+
+    // НОВЫЙ МЕТОД: Получение доступных должностей по роли
+    public async Task<List<string>> GetPositionsByRoleAsync(string role)
+    {
+        var positions = new List<string>();
+        const string query = "SELECT Наименование FROM Должность WHERE Роль_в_приложении = @role ORDER BY Наименование";
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@role", role);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                positions.Add(reader.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetPositionsByRoleAsync error: {ex.Message}");
+        }
+        return positions;
+    }
+
+    public async Task<bool> RestoreEmployeeAsync(int id)
+    {
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            const string query = "UPDATE Сотрудник SET Активен = true WHERE Код_сотр = @id";
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"RestoreEmployeeAsync error: {ex.Message}");
+            return false;
+        }
     }
 }

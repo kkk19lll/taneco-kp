@@ -1,198 +1,695 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Taneco.ViewModels"
-             x:Class="Taneco.Views.StaffView"
-             x:DataType="vm:StaffViewModel">
-    
-    <Grid ColumnDefinitions="1.5*, 2.5*">
-        
-        <!-- Левая панель - список сотрудников -->
-        <Border Grid.Column="0" Background="{StaticResource CardBrush}" Margin="10,10,5,10" CornerRadius="8">
-            <StackPanel>
-                
-                <TextBox Watermark="Поиск по фамилии..." 
-                         Text="{Binding SearchText, Mode=TwoWay}" 
-                         Margin="10" Height="35"/>
-                
-                <ScrollViewer Height="400">
-                    <ListBox ItemsSource="{Binding Employees}" 
-                             SelectedItem="{Binding SelectedEmployee}" 
-                             BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="10" Margin="0,0,0,1">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding FullName}" FontWeight="Bold" 
-                                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
-                                        <TextBlock Text="{Binding Position}" FontSize="11" 
-                                                   Foreground="{StaticResource TextMutedBrush}"/>
-                                        <TextBlock Text="{Binding Department}" FontSize="10" 
-                                                   Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBlock Text="{Binding Role}" FontSize="10" 
-                                                   Foreground="{StaticResource AccentBrush}"/>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </ScrollViewer>
-                
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10,0,10">
-                    <Button Command="{Binding RefreshCommand}" Padding="15,8">Обновить</Button>
-                    <Button Command="{Binding AddEmployeeCommand}" 
-                            IsVisible="{Binding CanManageStaff}"
-                            Background="{StaticResource WarningBrush}" 
-                            Padding="15,8">Добавить сотрудника</Button>
-                </StackPanel>
-                
-                <TextBlock Text="{Binding Employees.Count, StringFormat='Всего сотрудников: {0}'}" 
-                           FontSize="11" Foreground="{StaticResource TextMutedBrush}" 
-                           HorizontalAlignment="Center" Margin="10"/>
-                
-            </StackPanel>
-        </Border>
-        
-        <!-- Правая панель - детали и редактирование -->
-        <Border Grid.Column="1" Background="{StaticResource CardBrush}" Margin="5,10,10,10" CornerRadius="8">
-            <ScrollViewer>
-                <StackPanel Margin="15">
-                    
-                    <TextBlock Text="Информация о сотруднике" Classes="h2" Margin="0,0,0,15"/>
-                    
-                    <!-- Кнопки управления -->
-                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,15"
-                                IsVisible="{Binding CanManageStaff}">
-                        <Button Command="{Binding EditCommand}" 
-                                IsVisible="{Binding !IsEditMode}"
-                                IsEnabled="{Binding IsEmployeeSelected}"
-                                Background="{StaticResource WarningBrush}" 
-                                Padding="15,8">
-                            Редактировать
-                        </Button>
-                        <Button Command="{Binding DeleteEmployeeCommand}" 
-                                IsEnabled="{Binding IsEmployeeSelected}"
-                                Background="{StaticResource DangerBrush}" 
-                                Padding="15,8">
-                            Удалить
-                        </Button>
-                    </StackPanel>
-                    
-                    <!-- Режим просмотра -->
-                    <StackPanel IsVisible="{Binding !IsEditMode}">
-                        
-                        <StackPanel IsVisible="{Binding IsEmployeeSelected}">
-                            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" 
-                                  ColumnDefinitions="120,*" Margin="0,0,0,15">
-                                
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Фамилия:" Foreground="{StaticResource TextMutedBrush}"/>
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedEmployee.LastName}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}"/>
-                                
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Имя:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedEmployee.FirstName}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Отчество:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedEmployee.Patronymic}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Телефон:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedEmployee.Phone}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Отдел:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedEmployee.Department}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Должность:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedEmployee.Position}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Роль:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedEmployee.Role}" 
-                                           Foreground="{StaticResource AccentBrush}" Margin="0,8,0,0"/>
-                                
-                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Логин:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedEmployee.Login}" 
-                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,0"/>
-                                
-                            </Grid>
-                            
-                            <Button Command="{Binding ResetPasswordCommand}" 
-                                    IsEnabled="{Binding IsEmployeeSelected}"
-                                    Background="{StaticResource InfoBrush}" 
-                                    Padding="15,8"
-                                    HorizontalAlignment="Left">
-                                Сбросить пароль
-                            </Button>
-                        </StackPanel>
-                        
-                        <TextBlock IsVisible="{Binding IsEmployeeNotSelected}"
-                                   Text="Выберите сотрудника из списка слева"
-                                   FontSize="12" Foreground="{StaticResource TextMutedBrush}"
-                                   HorizontalAlignment="Center" Margin="0,50,0,0"/>
-                    </StackPanel>
-                    
-                    <!-- Режим редактирования -->
-                    <StackPanel IsVisible="{Binding IsEditMode}">
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" 
-                              ColumnDefinitions="120,*" Margin="0,0,0,15">
-                            
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Фамилия:" Foreground="{StaticResource TextMutedBrush}"/>
-                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditLastName}" Margin="0,0,0,5"/>
-                            
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Имя:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditFirstName}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Отчество:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditPatronymic}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Телефон:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding EditPhone}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Отдел:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Departments}" 
-                                      SelectedItem="{Binding EditDepartment}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Должность:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding Positions}" 
-                                      SelectedItem="{Binding EditPosition}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Роль:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <ComboBox Grid.Row="6" Grid.Column="1" ItemsSource="{Binding AvailableRoles}" 
-                                      SelectedItem="{Binding EditRole}" Margin="0,8,0,5">
-                                <ComboBox.ItemTemplate>
+<UserControl
+    x:Class="Taneco.Views.StaffView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    x:DataType="vm:StaffViewModel">
+
+    <TabControl Margin="10">
+
+        <!--  Вкладка "Сотрудники" (активные)  -->
+        <TabItem Header="Сотрудники">
+            <Grid ColumnDefinitions="1.5*, 2.5*">
+
+                <!--  Левая панель - список сотрудников  -->
+                <Border
+                    Grid.Column="0"
+                    Margin="10,10,5,10"
+                    Background="{StaticResource CardBrush}"
+                    CornerRadius="8">
+                    <StackPanel>
+
+                        <TextBox
+                            Height="35"
+                            Margin="10"
+                            Text="{Binding SearchTextActive, Mode=TwoWay}"
+                            Watermark="Поиск по фамилии..." />
+
+                        <ScrollViewer Height="400">
+                            <ListBox
+                                BorderThickness="0"
+                                ItemsSource="{Binding ActiveEmployees}"
+                                SelectedItem="{Binding SelectedActiveEmployee}">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}"/>
+                                        <Border Margin="0,0,0,1" Padding="10">
+                                            <StackPanel>
+                                                <TextBlock
+                                                    FontSize="13"
+                                                    FontWeight="Bold"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                                    Text="{Binding FullName}" />
+                                                <TextBlock
+                                                    FontSize="11"
+                                                    Foreground="{StaticResource TextMutedBrush}"
+                                                    Text="{Binding Position}" />
+                                                <TextBlock
+                                                    FontSize="10"
+                                                    Foreground="{StaticResource TextDarkBrush}"
+                                                    Text="{Binding Department}" />
+                                                <TextBlock
+                                                    FontSize="10"
+                                                    Foreground="{StaticResource AccentBrush}"
+                                                    Text="{Binding Role}" />
+                                            </StackPanel>
+                                        </Border>
                                     </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            
-                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Логин:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding EditLogin}" Margin="0,8,0,5"/>
-                            
-                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Пароль:" Foreground="{StaticResource TextMutedBrush}" Margin="0,8,0,0"/>
-                            <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding EditPassword}" Margin="0,8,0,5"/>
-                            
-                        </Grid>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Button Command="{Binding SaveEmployeeCommand}" 
-                                    Background="{StaticResource SuccessBrush}" 
-                                    Padding="15,8">
-                                Сохранить
-                            </Button>
-                            <Button Command="{Binding CancelEditCommand}" 
-                                    Background="{StaticResource TextMutedBrush}" 
-                                    Padding="15,8">
-                                Отмена
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+
+                        <StackPanel
+                            Margin="0,10,0,10"
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="10">
+                            <Button Padding="15,8" Command="{Binding RefreshActiveCommand}">Обновить</Button>
+                            <Button
+                                Padding="15,8"
+                                Background="{StaticResource WarningBrush}"
+                                Command="{Binding AddEmployeeCommand}"
+                                IsVisible="{Binding CanManageStaff}">
+                                Добавить сотрудника
                             </Button>
                         </StackPanel>
+
+                        <TextBlock
+                            Margin="10"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{StaticResource TextMutedBrush}"
+                            Text="{Binding ActiveEmployees.Count, StringFormat='Активных сотрудников: {0}'}" />
+
                     </StackPanel>
-                    
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
-        
-    </Grid>
+                </Border>
+
+                <!--  Правая панель - детали и редактирование  -->
+                <Border
+                    Grid.Column="1"
+                    Margin="5,10,10,10"
+                    Background="{StaticResource CardBrush}"
+                    CornerRadius="8">
+                    <ScrollViewer>
+                        <StackPanel Margin="15">
+
+                            <TextBlock
+                                Margin="0,0,0,15"
+                                Classes="h2"
+                                Text="Информация о сотруднике" />
+
+                            <!--  Кнопки управления в режиме просмотра  -->
+                            <StackPanel
+                                Margin="0,0,0,15"
+                                IsVisible="{Binding !IsEditMode}"
+                                Orientation="Horizontal"
+                                Spacing="10">
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource WarningBrush}"
+                                    Command="{Binding EditCommand}"
+                                    IsEnabled="{Binding IsActiveEmployeeSelected}">
+                                    Редактировать
+                                </Button>
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource DangerBrush}"
+                                    Command="{Binding ArchiveEmployeeCommand}"
+                                    IsEnabled="{Binding IsActiveEmployeeSelected}">
+                                    Удалить
+                                </Button>
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource InfoBrush}"
+                                    Command="{Binding ResetPasswordCommand}"
+                                    IsEnabled="{Binding IsActiveEmployeeSelected}">
+                                    Сбросить пароль
+                                </Button>
+                            </StackPanel>
+
+                            <!--  Режим просмотра  -->
+                            <StackPanel IsVisible="{Binding !IsEditMode}">
+
+                                <StackPanel IsVisible="{Binding IsActiveEmployeeSelected}">
+                                    <Grid
+                                        Margin="0,0,0,15"
+                                        ColumnDefinitions="120,*"
+                                        RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+                                        <TextBlock
+                                            Grid.Row="0"
+                                            Grid.Column="0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Фамилия:" />
+                                        <TextBlock
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.LastName}" />
+
+                                        <TextBlock
+                                            Grid.Row="1"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Имя:" />
+                                        <TextBlock
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.FirstName}" />
+
+                                        <TextBlock
+                                            Grid.Row="2"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Отчество:" />
+                                        <TextBlock
+                                            Grid.Row="2"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Patronymic}" />
+
+                                        <TextBlock
+                                            Grid.Row="3"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Телефон:" />
+                                        <TextBlock
+                                            Grid.Row="3"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Phone}" />
+
+                                        <TextBlock
+                                            Grid.Row="4"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Дата приема:" />
+                                        <TextBlock
+                                            Grid.Row="4"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.HireDate, StringFormat='yyyy-MM-dd'}" />
+
+                                        <TextBlock
+                                            Grid.Row="5"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Отдел:" />
+                                        <TextBlock
+                                            Grid.Row="5"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Department}" />
+
+                                        <TextBlock
+                                            Grid.Row="6"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Должность:" />
+                                        <TextBlock
+                                            Grid.Row="6"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Position}" />
+
+                                        <TextBlock
+                                            Grid.Row="7"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Роль:" />
+                                        <TextBlock
+                                            Grid.Row="7"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource AccentBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Role}" />
+
+                                        <TextBlock
+                                            Grid.Row="8"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Логин:" />
+                                        <TextBlock
+                                            Grid.Row="8"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Text="{Binding SelectedActiveEmployee.Login}" />
+
+                                        <TextBlock
+                                            Grid.Row="9"
+                                            Grid.Column="0"
+                                            Margin="0,8,0,0"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Text="Статус:" />
+                                        <Border
+                                            Grid.Row="9"
+                                            Grid.Column="1"
+                                            Margin="0,8,0,0"
+                                            Padding="5,2"
+                                            HorizontalAlignment="Left"
+                                            Background="{StaticResource SuccessBrush}"
+                                            CornerRadius="4">
+                                            <TextBlock
+                                                FontSize="10"
+                                                Foreground="White"
+                                                Text="Активен" />
+                                        </Border>
+
+                                    </Grid>
+                                </StackPanel>
+
+                                <TextBlock
+                                    Margin="0,50,0,0"
+                                    HorizontalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{StaticResource TextMutedBrush}"
+                                    IsVisible="{Binding IsActiveEmployeeNotSelected}"
+                                    Text="Выберите сотрудника из списка слева" />
+                            </StackPanel>
+
+                            <!--  Режим редактирования/добавления  -->
+                            <StackPanel IsVisible="{Binding IsEditMode}">
+                                <Grid
+                                    Margin="0,0,0,15"
+                                    ColumnDefinitions="120,*"
+                                    RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+                                    <TextBlock
+                                        Grid.Row="0"
+                                        Grid.Column="0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Фамилия:" />
+                                    <TextBox
+                                        Grid.Row="0"
+                                        Grid.Column="1"
+                                        Margin="0,0,0,5"
+                                        Text="{Binding EditLastName}" />
+
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Имя:" />
+                                    <TextBox
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        Text="{Binding EditFirstName}" />
+
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Отчество:" />
+                                    <TextBox
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        Text="{Binding EditPatronymic}" />
+
+                                    <TextBlock
+                                        Grid.Row="3"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Телефон:" />
+                                    <TextBox
+                                        x:Name="PhoneTextBox"
+                                        Grid.Row="3"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        MaxLength="18"
+                                        Text="{Binding EditPhoneDisplay, Mode=TwoWay}"
+                                        Watermark="+7 (999) 999-99-99" />
+
+                                    <TextBlock
+                                        Grid.Row="4"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Дата приема:" />
+                                    <TextBox
+                                        x:Name="HireDateTextBox"
+                                        Grid.Row="4"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        MaxLength="10"
+                                        Text="{Binding EditHireDateDisplay, Mode=TwoWay}"
+                                        Watermark="ГГГГ-ММ-ДД" />
+
+                                    <TextBlock
+                                        Grid.Row="5"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Отдел:" />
+                                    <ComboBox
+                                        Grid.Row="5"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        ItemsSource="{Binding Departments}"
+                                        SelectedItem="{Binding EditDepartment}" />
+
+                                    <TextBlock
+                                        Grid.Row="6"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Должность:" />
+                                    <ComboBox
+                                        Grid.Row="6"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        ItemsSource="{Binding Positions}"
+                                        SelectedItem="{Binding EditPosition}" />
+
+                                    <TextBlock
+                                        Grid.Row="7"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Роль:" />
+                                    <ComboBox
+                                        Grid.Row="7"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        ItemsSource="{Binding AvailableRoles}"
+                                        SelectedItem="{Binding EditRole}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                    <TextBlock
+                                        Grid.Row="8"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Логин:" />
+                                    <TextBox
+                                        Grid.Row="8"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        Text="{Binding EditLogin}" />
+
+                                    <TextBlock
+                                        Grid.Row="9"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Пароль:" />
+                                    <TextBox
+                                        Grid.Row="9"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,5"
+                                        Text="{Binding EditPassword}"
+                                        Watermark="Пароль (обязателен для нового сотрудника)" />
+
+                                </Grid>
+
+                                <!--  Кнопки Сохранить и Отмена выровнены горизонтально  -->
+                                <StackPanel
+                                    Margin="0,0,0,15"
+                                    HorizontalAlignment="Left"
+                                    Orientation="Horizontal"
+                                    Spacing="10">
+                                    <Button
+                                        Padding="15,8"
+                                        Background="{StaticResource SuccessBrush}"
+                                        Command="{Binding SaveEmployeeCommand}">
+                                        Сохранить
+                                    </Button>
+                                    <Button
+                                        Padding="15,8"
+                                        Background="{StaticResource TextMutedBrush}"
+                                        Command="{Binding CancelEditCommand}">
+                                        Отмена
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+            </Grid>
+        </TabItem>
+
+        <!--  Вкладка "Архив" (неактивные сотрудники)  -->
+        <TabItem Header="Архив">
+            <Grid ColumnDefinitions="1.5*, 2.5*">
+
+                <!--  Левая панель - список архивных сотрудников  -->
+                <Border
+                    Grid.Column="0"
+                    Margin="10,10,5,10"
+                    Background="{StaticResource CardBrush}"
+                    CornerRadius="8">
+                    <StackPanel>
+
+                        <TextBox
+                            Height="35"
+                            Margin="10"
+                            Text="{Binding SearchTextArchive, Mode=TwoWay}"
+                            Watermark="Поиск..." />
+
+                        <ScrollViewer Height="400">
+                            <ListBox
+                                BorderThickness="0"
+                                ItemsSource="{Binding ArchivedEmployees}"
+                                SelectedItem="{Binding SelectedArchivedEmployee}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,1" Padding="10">
+                                            <StackPanel>
+                                                <TextBlock
+                                                    FontSize="13"
+                                                    FontWeight="Bold"
+                                                    Foreground="{StaticResource TextMutedBrush}"
+                                                    Text="{Binding FullName}" />
+                                                <TextBlock
+                                                    FontSize="11"
+                                                    Foreground="{StaticResource TextDarkBrush}"
+                                                    Text="{Binding Position}" />
+                                                <TextBlock
+                                                    FontSize="10"
+                                                    Foreground="{StaticResource TextDarkBrush}"
+                                                    Text="{Binding Department}" />
+                                                <Border
+                                                    Margin="0,5,0,0"
+                                                    Padding="5,2"
+                                                    HorizontalAlignment="Left"
+                                                    Background="{StaticResource DangerBrush}"
+                                                    CornerRadius="4">
+                                                    <TextBlock
+                                                        FontSize="10"
+                                                        Foreground="White"
+                                                        Text="Архив" />
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+
+                        <StackPanel
+                            Margin="0,10,0,10"
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="10">
+                            <Button Padding="15,8" Command="{Binding RefreshArchiveCommand}">Обновить</Button>
+                            <Button
+                                Padding="15,8"
+                                Background="{StaticResource SuccessBrush}"
+                                Command="{Binding RestoreEmployeeCommand}"
+                                IsEnabled="{Binding IsArchivedEmployeeSelected}"
+                                IsVisible="{Binding CanManageStaff}">
+                                Восстановить
+                            </Button>
+                        </StackPanel>
+
+                        <TextBlock
+                            Margin="10"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{StaticResource TextMutedBrush}"
+                            Text="{Binding ArchivedEmployees.Count, StringFormat='Сотрудников в архиве: {0}'}" />
+
+                    </StackPanel>
+                </Border>
+
+                <!--  Правая панель - детали архивного сотрудника  -->
+                <Border
+                    Grid.Column="1"
+                    Margin="5,10,10,10"
+                    Background="{StaticResource CardBrush}"
+                    CornerRadius="8">
+                    <ScrollViewer>
+                        <StackPanel Margin="15">
+
+                            <TextBlock
+                                Margin="0,0,0,15"
+                                Classes="h2"
+                                Text="Информация об архивном сотруднике" />
+
+                            <StackPanel IsVisible="{Binding IsArchivedEmployeeSelected}">
+                                <Grid
+                                    Margin="0,0,0,15"
+                                    ColumnDefinitions="120,*"
+                                    RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+                                    <TextBlock
+                                        Grid.Row="0"
+                                        Grid.Column="0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Фамилия:" />
+                                    <TextBlock
+                                        Grid.Row="0"
+                                        Grid.Column="1"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.LastName}" />
+
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Имя:" />
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.FirstName}" />
+
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Отчество:" />
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Patronymic}" />
+
+                                    <TextBlock
+                                        Grid.Row="3"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Телефон:" />
+                                    <TextBlock
+                                        Grid.Row="3"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Phone}" />
+
+                                    <TextBlock
+                                        Grid.Row="4"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Дата приема:" />
+                                    <TextBlock
+                                        Grid.Row="4"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.HireDate, StringFormat='yyyy-MM-dd'}" />
+
+                                    <TextBlock
+                                        Grid.Row="5"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Отдел:" />
+                                    <TextBlock
+                                        Grid.Row="5"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Department}" />
+
+                                    <TextBlock
+                                        Grid.Row="6"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Должность:" />
+                                    <TextBlock
+                                        Grid.Row="6"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Position}" />
+
+                                    <TextBlock
+                                        Grid.Row="7"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Роль:" />
+                                    <TextBlock
+                                        Grid.Row="7"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Role}" />
+
+                                    <TextBlock
+                                        Grid.Row="8"
+                                        Grid.Column="0"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Text="Логин:" />
+                                    <TextBlock
+                                        Grid.Row="8"
+                                        Grid.Column="1"
+                                        Margin="0,8,0,0"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        Text="{Binding SelectedArchivedEmployee.Login}" />
+
+                                </Grid>
+                            </StackPanel>
+
+                            <TextBlock
+                                Margin="0,50,0,0"
+                                HorizontalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{StaticResource TextMutedBrush}"
+                                IsVisible="{Binding IsArchivedEmployeeNotSelected}"
+                                Text="Выберите архивного сотрудника из списка слева" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+            </Grid>
+        </TabItem>
+
+    </TabControl>
+
 </UserControl>
