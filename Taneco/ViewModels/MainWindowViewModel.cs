@@ -15,7 +15,6 @@ public class MainWindowViewModel : ViewModelBase
     {
         CurrentUser = user;
 
-        // Инициализация всех команд
         ShowMonitoringCommand = new RelayCommand(_ => ShowMonitoring());
         ShowEquipmentsCommand = new RelayCommand(_ => ShowEquipments());
         ShowProblemsCommand = new RelayCommand(_ => ShowProblems());
@@ -26,7 +25,7 @@ public class MainWindowViewModel : ViewModelBase
         ShowEquipmentManagementCommand = new RelayCommand(_ => ShowEquipmentManagement());
         LogoutCommand = new RelayCommand(_ => Environment.Exit(0));
 
-        // Показываем главный экран
+
         ShowMonitoring();
     }
 
@@ -48,7 +47,6 @@ public class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _currentTitle, value);
     }
 
-    // Права доступа для отображения меню
     public bool CanMonitor => CurrentUser?.CanMonitor ?? false;
     public bool CanEditSensors => CurrentUser?.CanEditSensors ?? false;
     public bool CanManageProblems => CurrentUser?.CanManageProblems ?? false;
