@@ -77,6 +77,10 @@
               "target": "Package",
               "version": "[8.0.6, )"
             },
+            "QuestPDF": {
+              "target": "Package",
+              "version": "[2026.5.0, )"
+            },
             "itext7": {
               "target": "Package",
               "version": "[8.0.5, )"

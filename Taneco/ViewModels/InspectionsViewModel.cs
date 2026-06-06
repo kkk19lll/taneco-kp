@@ -28,6 +28,7 @@ public class InspectionsViewModel : ViewModelBase
     private DateTime? _filterEndDate;
     private ObservableCollection<string> _statusFilters;
     private Window? _parentWindow;
+    private Window? _tempWindow;
 
     public InspectionsViewModel()
     {
@@ -35,7 +36,6 @@ public class InspectionsViewModel : ViewModelBase
         _allInspections = new ObservableCollection<Inspection>();
         _filteredInspections = new ObservableCollection<Inspection>();
 
-        // Все 10 статусов для фильтрации
         _statusFilters = new ObservableCollection<string>
         {
             "Все",
@@ -56,7 +56,6 @@ public class InspectionsViewModel : ViewModelBase
         GenerateReportCommand = new RelayCommand(async () => await GenerateReportPdfOnly(), () => IsAdmin && !IsLoading);
         InspectionClickCommand = new RelayCommand(async (param) => await ShowInspectionDetails(param));
 
-        // Загружаем данные
         Task.Run(async () => await LoadInspectionsAsync());
     }
 
@@ -87,11 +86,10 @@ public class InspectionsViewModel : ViewModelBase
     public bool IsLoading
     {
         get => _isLoading;
-        set 
-        { 
+        set
+        {
             if (SetProperty(ref _isLoading, value))
             {
-                // Обновляем состояние команд при изменении IsLoading
                 (RefreshCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 (GenerateReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
@@ -203,7 +201,7 @@ public class InspectionsViewModel : ViewModelBase
     private async Task LoadInspectionsAsync()
     {
         if (IsLoading) return;
-        
+
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = true);
 
         try
@@ -319,38 +317,80 @@ public class InspectionsViewModel : ViewModelBase
                 return;
             }
 
+            // Убеждаемся что мы в UI потоке для открытия диалога
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await OpenSaveFileDialogAndGenerateReport();
+            });
+        }
+        catch (Exception ex)
+        {
+            await ShowError("Ошибка при сохранении отчета", ex.Message);
+        }
+    }
+
+    private async Task OpenSaveFileDialogAndGenerateReport()
+    {
+        try
+        {
+            // Добавим отладочный вывод
+            Console.WriteLine($"OpenSaveFileDialogAndGenerateReport: FilterStartDate={_filterStartDate?.ToString("yyyy-MM-dd")}, FilterEndDate={_filterEndDate?.ToString("yyyy-MM-dd")}");
+
+            if (!_filterStartDate.HasValue || !_filterEndDate.HasValue)
+            {
+                await ShowWarning("Нет периода", "Пожалуйста, укажите даты начала и окончания в фильтрах выше");
+                return;
+            }
+
             IStorageProvider? storageProvider = null;
 
-            if (_parentWindow != null)
+            // Пытаемся получить StorageProvider из родительского окна
+            if (_parentWindow != null && _parentWindow.IsVisible)
             {
                 storageProvider = _parentWindow.StorageProvider;
             }
 
+            // Если нет - ищем через Application
             if (storageProvider == null && Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
-                if (desktop.MainWindow != null)
+                if (desktop.MainWindow?.IsVisible == true)
                 {
                     storageProvider = desktop.MainWindow.StorageProvider;
                 }
                 else if (desktop.Windows.Count > 0)
                 {
-                    storageProvider = desktop.Windows[0].StorageProvider;
+                    var activeWindow = desktop.Windows.FirstOrDefault(w => w.IsVisible);
+                    if (activeWindow != null)
+                    {
+                        storageProvider = activeWindow.StorageProvider;
+                        _parentWindow = activeWindow;
+                    }
                 }
             }
 
+            // Последняя попытка - создаем временное окно
             if (storageProvider == null)
             {
-                var tempWindow = new Window
+                _tempWindow = new Window
                 {
-                    Width = 1,
-                    Height = 1,
-                    Opacity = 0,
-                    ShowInTaskbar = false
+                    Width = 400,
+                    Height = 300,
+                    Title = "Сохранение отчета",
+                    Opacity = 1,
+                    ShowInTaskbar = false,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen
                 };
-                tempWindow.Show();
-                storageProvider = tempWindow.StorageProvider;
-                await Task.Delay(100);
-                tempWindow.Close();
+
+                var panel = new StackPanel();
+                var text = new TextBlock { Text = "Пожалуйста, выберите место для сохранения отчета...", Margin = new Avalonia.Thickness(10) };
+                var progress = new Avalonia.Controls.ProgressBar { IsIndeterminate = true, Height = 20, Margin = new Avalonia.Thickness(10) };
+                panel.Children.Add(text);
+                panel.Children.Add(progress);
+                _tempWindow.Content = panel;
+
+                _tempWindow.Show();
+                storageProvider = _tempWindow.StorageProvider;
+                await Task.Delay(200);
             }
 
             if (storageProvider == null)
@@ -368,10 +408,16 @@ public class InspectionsViewModel : ViewModelBase
                 DefaultExtension = "pdf",
                 FileTypeChoices = new[]
                 {
-                    new FilePickerFileType("PDF файлы") { Patterns = new[] { "*.pdf" } },
-                    new FilePickerFileType("Все файлы") { Patterns = new[] { "*.*" } }
-                }
+                new FilePickerFileType("PDF файлы") { Patterns = new[] { "*.pdf" } },
+                new FilePickerFileType("Все файлы") { Patterns = new[] { "*.*" } }
+            }
             });
+
+            if (_tempWindow != null)
+            {
+                _tempWindow.Close();
+                _tempWindow = null;
+            }
 
             if (file == null)
             {
@@ -380,8 +426,17 @@ public class InspectionsViewModel : ViewModelBase
             }
 
             string reportPath = file.Path.LocalPath;
-            bool reportSuccess = await _db.GenerateReportAsync(_filterStartDate.Value, _filterEndDate.Value, reportPath);
-            
+
+            Console.WriteLine($"Выбран путь для сохранения: {reportPath}");
+
+            // Используем даты из фильтров
+            DateTime startDate = _filterStartDate.Value;
+            DateTime endDate = _filterEndDate.Value;
+
+            Console.WriteLine($"Даты для отчета: start={startDate:yyyy-MM-dd}, end={endDate:yyyy-MM-dd}");
+
+            bool reportSuccess = await _db.GenerateReportAsync(startDate, endDate, reportPath);
+
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
 
             if (reportSuccess)
@@ -395,25 +450,38 @@ public class InspectionsViewModel : ViewModelBase
             }
             else
             {
-                await ShowWarning("Нет данных", $"За период {_filterStartDate.Value:dd.MM.yyyy} - {_filterEndDate.Value:dd.MM.yyyy} нет проверок для формирования отчета");
+                await ShowWarning("Нет данных", $"За период {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy} нет проверок для формирования отчета\n\nПроверьте, что в выбранном диапазоне есть проверки.");
             }
         }
         catch (Exception ex)
         {
+            if (_tempWindow != null)
+            {
+                _tempWindow.Close();
+                _tempWindow = null;
+            }
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
+            Console.WriteLine($"OpenSaveFileDialogAndGenerateReport error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
             await ShowError("Ошибка при сохранении отчета", ex.Message);
         }
     }
 
     private async Task ShowError(string title, string message)
     {
-        var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Error);
-        await box.ShowAsync();
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Error);
+            await box.ShowAsync();
+        });
     }
 
     private async Task ShowWarning(string title, string message)
     {
-        var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Warning);
-        await box.ShowAsync();
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Warning);
+            await box.ShowAsync();
+        });
     }
 }

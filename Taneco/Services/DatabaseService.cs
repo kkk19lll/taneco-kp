@@ -6,13 +6,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Npgsql;
 using Taneco.Models;
-using iText.Kernel.Pdf;
-using iText.Layout;
-using iText.Layout.Element;
-using iText.Layout.Properties;
-using iText.Kernel.Font;
-using iText.IO.Font.Constants;
 using System.IO;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace Taneco.Services;
 
@@ -23,6 +20,7 @@ public class DatabaseService
     public DatabaseService()
     {
         _connectionString = "Host=localhost;Port=5432;Database=kp;Username=postgres;Password=123;";
+        QuestPDF.Settings.License = LicenseType.Community;
     }
 
     public static bool IsPasswordValid(string password)
@@ -647,7 +645,7 @@ public class DatabaseService
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                inspections.Add(new Inspection
+                var inspection = new Inspection
                 {
                     Id = reader.GetInt32(0),
                     ProblemId = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
@@ -659,21 +657,31 @@ public class DatabaseService
                     Description = reader.GetString(7),
                     ProblemDescription = reader.GetString(8),
                     ProblemType = reader.GetString(9)
-                });
+                };
+                inspections.Add(inspection);
+            }
+
+            Console.WriteLine($"GetAllInspectionsForReportAsync: загружено {inspections.Count} проверок");
+
+            for (int i = 0; i < Math.Min(5, inspections.Count); i++)
+            {
+                Console.WriteLine($"  Проверка {i + 1}: ID={inspections[i].Id}, Дата={inspections[i].StartDate:yyyy-MM-dd}, Статус={inspections[i].Status}");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"GetAllInspectionsForReportAsync error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
         return inspections;
     }
 
-    // *** ПОЛНОСТЬЮ ПЕРЕПИСАННЫЙ МЕТОД ДЛЯ ОТЧЕТА - РАБОТАЕТ ****
     public async Task<bool> GenerateReportAsync(DateTime startDate, DateTime endDate, string savePath)
     {
         try
         {
+            Console.WriteLine($"GenerateReportAsync started: startDate={startDate:yyyy-MM-dd}, endDate={endDate:yyyy-MM-dd}, savePath={savePath}");
+
             if (string.IsNullOrWhiteSpace(savePath))
             {
                 Console.WriteLine("GenerateReportAsync error: savePath is null or empty");
@@ -688,9 +696,13 @@ public class DatabaseService
 
             var inspections = await GetAllInspectionsForReportAsync();
 
+            Console.WriteLine($"Всего проверок в БД: {inspections.Count}");
+
             var filteredInspections = inspections
                 .Where(i => i.StartDate.Date >= startDate.Date && i.StartDate.Date <= endDate.Date)
                 .ToList();
+
+            Console.WriteLine($"Отфильтровано проверок за период: {filteredInspections.Count}");
 
             if (filteredInspections.Count == 0)
             {
@@ -698,9 +710,9 @@ public class DatabaseService
                 return false;
             }
 
-            // ВАЖНО: ЗАПУСКАЕМ PDF ГЕНЕРАЦИЮ В ОТДЕЛЬНОМ ПОТОКЕ
-            await Task.Run(() => GeneratePdfSync(filteredInspections, startDate, endDate, savePath));
+            await Task.Run(() => GeneratePdfWithQuestPDF(filteredInspections, startDate, endDate, savePath));
 
+            Console.WriteLine("GenerateReportAsync: PDF successfully created");
             return true;
         }
         catch (Exception ex)
@@ -711,220 +723,151 @@ public class DatabaseService
         }
     }
 
-    // НОВЫЙ СИНХРОННЫЙ МЕТОД ДЛЯ ГЕНЕРАЦИИ PDF
-    private void GeneratePdfSync(List<Inspection> inspections, DateTime startDate, DateTime endDate, string filePath)
+    private void GeneratePdfWithQuestPDF(List<Inspection> inspections, DateTime startDate, DateTime endDate, string filePath)
     {
-        // СОЗДАЕМ ФАЙЛ
-        using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+        try
         {
-            using (var writer = new PdfWriter(fs))
+            var document = Document.Create(container =>
             {
-                using (var pdf = new PdfDocument(writer))
+                container.Page(page =>
                 {
-                    var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4);
-                    document.SetMargins(50, 50, 50, 50);
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(10));
 
-                    // ШРИФТЫ
-                    var titleFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
-                    var regularFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
-                    var boldFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
-
-                    // ЗАГОЛОВОК
-                    var title = new Paragraph("ОТЧЕТ ПО ПРОВЕРКАМ")
-                        .SetFont(titleFont)
-                        .SetFontSize(18)
-                        .SetTextAlignment(TextAlignment.CENTER)
-                        .SetMarginBottom(10);
-                    document.Add(title);
-
-                    // ПЕРИОД
-                    var period = new Paragraph($"Период: {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy}")
-                        .SetFont(regularFont)
-                        .SetFontSize(11)
-                        .SetTextAlignment(TextAlignment.CENTER)
-                        .SetMarginBottom(5);
-                    document.Add(period);
-
-                    // ДАТА ФОРМИРОВАНИЯ
-                    var generatedDate = new Paragraph($"Дата формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}")
-                        .SetFont(regularFont)
-                        .SetFontSize(11)
-                        .SetTextAlignment(TextAlignment.CENTER)
-                        .SetMarginBottom(20);
-                    document.Add(generatedDate);
-
-                    // ЛИНИЯ
-                    document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
-
-                    // СТАТИСТИКА
-                    int completed = inspections.Count(i => i.Status == "Завершена");
-                    int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
-                    int planned = inspections.Count(i => i.Status == "Запланирована");
-                    int cancelled = inspections.Count(i => i.Status == "Отменена");
-                    int delayed = inspections.Count(i => i.Status == "Отложена");
-
-                    var statsTitle = new Paragraph("СТАТИСТИКА ПО СТАТУСАМ:")
-                        .SetFont(boldFont)
-                        .SetFontSize(12)
-                        .SetMarginTop(15)
-                        .SetMarginBottom(10);
-                    document.Add(statsTitle);
-
-                    var statsText = new Paragraph($"• Завершено: {completed}\n• В процессе: {inProgress}\n• Запланировано: {planned}\n• Отменено: {cancelled}\n• Отложено: {delayed}")
-                        .SetFont(regularFont)
-                        .SetFontSize(11)
-                        .SetMarginBottom(15);
-                    document.Add(statsText);
-
-                    // ЛИНИЯ
-                    document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
-
-                    // СПИСОК ПРОВЕРОК
-                    var listTitle = new Paragraph($"ПОДРОБНЫЙ СПИСОК ПРОВЕРОК (всего: {inspections.Count})")
-                        .SetFont(boldFont)
-                        .SetFontSize(12)
-                        .SetMarginTop(15)
-                        .SetMarginBottom(10);
-                    document.Add(listTitle);
-
-                    int num = 1;
-                    foreach (var inv in inspections)
-                    {
-                        var inspectionBlock = new Paragraph()
-                            .SetFont(regularFont)
-                            .SetFontSize(10)
-                            .SetMarginBottom(10);
-
-                        inspectionBlock.Add(new Paragraph($"[{num}] Проверка #{inv.Id}").SetFont(boldFont).SetFontSize(11));
-                        inspectionBlock.Add(new Paragraph($"   Тип проблемы:    {inv.ProblemType}"));
-                        inspectionBlock.Add(new Paragraph($"   Описание:        {TruncateText(inv.ProblemDescription, 80)}"));
-                        inspectionBlock.Add(new Paragraph($"   Инспектор:       {inv.EmployeeName}"));
-                        inspectionBlock.Add(new Paragraph($"   Дата начала:     {inv.StartDate:dd.MM.yyyy}"));
-                        inspectionBlock.Add(new Paragraph($"   Дата окончания:  {(inv.EndDate.HasValue ? inv.EndDate.Value.ToString("dd.MM.yyyy") : "Не завершена")}"));
-                        inspectionBlock.Add(new Paragraph($"   Статус:          {inv.Status}"));
-                        if (!string.IsNullOrEmpty(inv.Description))
+                    page.Header()
+                        .AlignCenter()
+                        .Column(col =>
                         {
-                            inspectionBlock.Add(new Paragraph($"   Комментарий:     {TruncateText(inv.Description, 80)}"));
-                        }
-                        inspectionBlock.Add(new Paragraph("   " + new string('-', 50)));
+                            col.Spacing(5);
+                            col.Item().Text("ОТЧЕТ ПО ПРОВЕРКАМ").Bold().FontSize(18);
+                            col.Item().Text($"Период: {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy}").FontSize(12);
+                            col.Item().Text($"Дата формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}").FontSize(11);
+                            col.Item().PaddingTop(10).LineHorizontal(1);
+                        });
 
-                        document.Add(inspectionBlock);
-                        num++;
-                    }
+                    page.Content().Column(col =>
+                    {
+                        col.Spacing(10);
 
-                    // ПОДВАЛ
-                    document.Add(new Paragraph("\n" + new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
-                    document.Add(new Paragraph("КОНЕЦ ОТЧЕТА").SetFont(boldFont).SetFontSize(10).SetTextAlignment(TextAlignment.CENTER));
-                    document.Add(new Paragraph(new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
+                        col.Item().Column(statsCol =>
+                        {
+                            statsCol.Spacing(5);
+                            statsCol.Item().Text("СТАТИСТИКА ПО СТАТУСАМ:").Bold().FontSize(13);
+                            
+                            int completed = inspections.Count(i => i.Status == "Завершена");
+                            int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
+                            int planned = inspections.Count(i => i.Status == "Запланирована");
+                            int cancelled = inspections.Count(i => i.Status == "Отменена");
+                            int delayed = inspections.Count(i => i.Status == "Отложена");
+                            int waiting = inspections.Count(i => i.Status == "Ожидает подтверждения");
+                            int analyzing = inspections.Count(i => i.Status == "На анализе данных");
+                            int urgent = inspections.Count(i => i.Status == "Требует срочного вмешательства");
+                            int pending = inspections.Count(i => i.Status == "На согласовании");
 
-                    document.Close();
-                }
-            }
+                            statsCol.Item().Text(text =>
+                            {
+                                text.Span($"• Завершено: {completed}\n");
+                                text.Span($"• В процессе: {inProgress}\n");
+                                text.Span($"• Запланировано: {planned}\n");
+                                text.Span($"• Отменено: {cancelled}\n");
+                                text.Span($"• Отложено: {delayed}\n");
+                                text.Span($"• Ожидает подтверждения: {waiting}\n");
+                                text.Span($"• На анализе данных: {analyzing}\n");
+                                text.Span($"• Требует срочного вмешательства: {urgent}\n");
+                                text.Span($"• На согласовании: {pending}");
+                            });
+                        });
+
+                        col.Item().LineHorizontal(1);
+
+                        col.Item().Text($"ПОДРОБНЫЙ СПИСОК ПРОВЕРОК (всего: {inspections.Count})").Bold().FontSize(13);
+
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(0.5f);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.5f);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("№").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Тип проблемы").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Описание").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Инспектор").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Дата начала").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Дата окончания").Bold().AlignCenter();
+                                header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Статус").Bold().AlignCenter();
+                            });
+
+                            int num = 1;
+                            foreach (var inv in inspections)
+                            {
+                                var rowColor = num % 2 == 0 ? Colors.Grey.Lighten3 : Colors.White;
+                                
+                                table.Cell().Background(rowColor).Padding(4).Text(num.ToString()).AlignCenter();
+                                table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.ProblemType, 25));
+                                table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.ProblemDescription, 40));
+                                table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.EmployeeName, 20));
+                                table.Cell().Background(rowColor).Padding(4).Text(inv.StartDate.ToString("dd.MM.yyyy")).AlignCenter();
+                                table.Cell().Background(rowColor).Padding(4).Text(inv.EndDate?.ToString("dd.MM.yyyy") ?? "—").AlignCenter();
+                                
+                                table.Cell().Background(rowColor).Padding(4).Text(inv.Status)
+                                    .FontColor(GetStatusColor(inv.Status))
+                                    .SemiBold();
+                                
+                                num++;
+                            }
+                        });
+                    });
+
+                    page.Footer()
+                        .AlignCenter()
+                        .Column(col =>
+                        {
+                            col.Spacing(5);
+                            col.Item().PaddingTop(10).LineHorizontal(1);
+                            col.Item().Text("КОНЕЦ ОТЧЕТА").Bold().FontSize(10);
+                            col.Item().Text($"Сформировано автоматически системой мониторинга {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(8);
+                        });
+                });
+            });
+
+            document.GeneratePdf(filePath);
+            Console.WriteLine($"PDF успешно создан: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GeneratePdfWithQuestPDF error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            throw;
         }
     }
 
-    private async Task SaveAsPdfWithIText7(List<Inspection> inspections, DateTime startDate, DateTime endDate, string filePath)
+    private string GetStatusColor(string status)
     {
-        await Task.Run(() =>
+        switch (status)
         {
-            using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                using (var writer = new PdfWriter(fs))
-                {
-                    using (var pdf = new PdfDocument(writer))
-                    {
-                        var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4);
-                        document.SetMargins(50, 50, 50, 50);
-
-                        var titleFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
-                        var regularFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
-                        var boldFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
-
-                        var title = new Paragraph("ОТЧЕТ ПО ПРОВЕРКАМ")
-                            .SetFont(titleFont)
-                            .SetFontSize(18)
-                            .SetTextAlignment(TextAlignment.CENTER)
-                            .SetMarginBottom(10);
-                        document.Add(title);
-
-                        var period = new Paragraph($"Период: {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy}")
-                            .SetFont(regularFont)
-                            .SetFontSize(11)
-                            .SetTextAlignment(TextAlignment.CENTER)
-                            .SetMarginBottom(5);
-                        document.Add(period);
-
-                        var generatedDate = new Paragraph($"Дата формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}")
-                            .SetFont(regularFont)
-                            .SetFontSize(11)
-                            .SetTextAlignment(TextAlignment.CENTER)
-                            .SetMarginBottom(20);
-                        document.Add(generatedDate);
-
-                        document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
-
-                        int completed = inspections.Count(i => i.Status == "Завершена");
-                        int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
-                        int planned = inspections.Count(i => i.Status == "Запланирована");
-                        int cancelled = inspections.Count(i => i.Status == "Отменена");
-                        int delayed = inspections.Count(i => i.Status == "Отложена");
-
-                        var statsTitle = new Paragraph("СТАТИСТИКА ПО СТАТУСАМ:")
-                            .SetFont(boldFont)
-                            .SetFontSize(12)
-                            .SetMarginTop(15)
-                            .SetMarginBottom(10);
-                        document.Add(statsTitle);
-
-                        var statsText = new Paragraph($"• Завершено: {completed}\n• В процессе: {inProgress}\n• Запланировано: {planned}\n• Отменено: {cancelled}\n• Отложено: {delayed}")
-                            .SetFont(regularFont)
-                            .SetFontSize(11)
-                            .SetMarginBottom(15);
-                        document.Add(statsText);
-
-                        document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
-
-                        var listTitle = new Paragraph($"ПОДРОБНЫЙ СПИСОК ПРОВЕРОК (всего: {inspections.Count})")
-                            .SetFont(boldFont)
-                            .SetFontSize(12)
-                            .SetMarginTop(15)
-                            .SetMarginBottom(10);
-                        document.Add(listTitle);
-
-                        int num = 1;
-                        foreach (var inv in inspections)
-                        {
-                            var inspectionBlock = new Paragraph()
-                                .SetFont(regularFont)
-                                .SetFontSize(10)
-                                .SetMarginBottom(10);
-
-                            inspectionBlock.Add(new Paragraph($"[{num}] Проверка #{inv.Id}").SetFont(boldFont).SetFontSize(11));
-                            inspectionBlock.Add(new Paragraph($"   Тип проблемы:    {inv.ProblemType}"));
-                            inspectionBlock.Add(new Paragraph($"   Описание:        {TruncateText(inv.ProblemDescription, 80)}"));
-                            inspectionBlock.Add(new Paragraph($"   Инспектор:       {inv.EmployeeName}"));
-                            inspectionBlock.Add(new Paragraph($"   Дата начала:     {inv.StartDate:dd.MM.yyyy}"));
-                            inspectionBlock.Add(new Paragraph($"   Дата окончания:  {(inv.EndDate.HasValue ? inv.EndDate.Value.ToString("dd.MM.yyyy") : "Не завершена")}"));
-                            inspectionBlock.Add(new Paragraph($"   Статус:          {inv.Status}"));
-                            if (!string.IsNullOrEmpty(inv.Description))
-                            {
-                                inspectionBlock.Add(new Paragraph($"   Комментарий:     {TruncateText(inv.Description, 80)}"));
-                            }
-                            inspectionBlock.Add(new Paragraph("   " + new string('-', 50)));
-
-                            document.Add(inspectionBlock);
-                            num++;
-                        }
-
-                        document.Add(new Paragraph("\n" + new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
-                        document.Add(new Paragraph("КОНЕЦ ОТЧЕТА").SetFont(boldFont).SetFontSize(10).SetTextAlignment(TextAlignment.CENTER));
-                        document.Add(new Paragraph(new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
-
-                        document.Close();
-                    }
-                }
-            }
-        });
+            case "Завершена":
+                return Colors.Green.Darken2;
+            case "Отменена":
+                return Colors.Red.Medium;
+            case "Отложена":
+                return Colors.Orange.Medium;
+            case "В процессе выполнения":
+                return Colors.Blue.Medium;
+            case "Требует срочного вмешательства":
+                return Colors.Red.Darken2;
+            default:
+                return Colors.Black;
+        }
     }
 
     private string TruncateText(string text, int maxLength)
