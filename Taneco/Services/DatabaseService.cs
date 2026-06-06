@@ -14,7 +14,7 @@ public class DatabaseService
 
     public DatabaseService()
     {
-        _connectionString = "Host=localhost;Port=5432;Database=Taneco 1;Username=postgres;Password=123;";
+        _connectionString = "Host=localhost;Port=5432;Database=kp;Username=postgres;Password=123;";
     }
 
     // Метод для проверки наличия запрещенных символов в пароле
