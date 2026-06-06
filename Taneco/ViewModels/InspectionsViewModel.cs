@@ -1,14 +1,15 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia.Controls.ApplicationLifetimes;
-using Taneco.Models;
-using Taneco.Services;
-using Taneco.Views;
+using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
+using Taneco.Models;
+using Taneco.Services;
 
 namespace Taneco.ViewModels;
 
@@ -19,21 +20,49 @@ public class InspectionsViewModel : ViewModelBase
     private ObservableCollection<Inspection> _filteredInspections;
     private bool _isLoading;
     private User? _currentUser;
+    private string _searchText = string.Empty;
     private string _selectedStatusFilter = "Все";
+    private string _filterStartDateText = string.Empty;
+    private string _filterEndDateText = string.Empty;
+    private DateTime? _filterStartDate;
+    private DateTime? _filterEndDate;
     private ObservableCollection<string> _statusFilters;
+    private Window? _parentWindow;
 
     public InspectionsViewModel()
     {
         _db = new DatabaseService();
         _allInspections = new ObservableCollection<Inspection>();
         _filteredInspections = new ObservableCollection<Inspection>();
-        _statusFilters = new ObservableCollection<string> { "Все", "Запланирована", "В процессе выполнения", "Завершена", "Отложена", "Отменена" };
 
-        RefreshCommand = new RelayCommand(() => Task.Run(async () => await LoadInspectionsAsync()), () => !IsLoading);
-        InspectionClickCommand = new RelayCommand(OnInspectionClick);
-        CreateScheduledInspectionCommand = new RelayCommand(() => Task.Run(async () => await CreateScheduledInspection()), () => CanCreateScheduled);
+        // Все 10 статусов для фильтрации
+        _statusFilters = new ObservableCollection<string>
+        {
+            "Все",
+            "Запланирована",
+            "В процессе выполнения",
+            "Требует дополнительной диагностики",
+            "Ожидает подтверждения",
+            "На анализе данных",
+            "Завершена",
+            "Отложена",
+            "Отменена",
+            "Требует срочного вмешательства",
+            "На согласовании"
+        };
 
+        RefreshCommand = new RelayCommand(async () => await LoadInspectionsAsync(), () => !IsLoading);
+        SearchCommand = new RelayCommand(ApplyFilters);
+        GenerateReportCommand = new RelayCommand(async () => await GenerateReportPdfOnly(), () => IsAdmin && !IsLoading);
+        InspectionClickCommand = new RelayCommand(async (param) => await ShowInspectionDetails(param));
+
+        // Загружаем данные
         Task.Run(async () => await LoadInspectionsAsync());
+    }
+
+    public void SetParentWindow(Window window)
+    {
+        _parentWindow = window;
     }
 
     public User? CurrentUser
@@ -41,9 +70,11 @@ public class InspectionsViewModel : ViewModelBase
         get => _currentUser;
         set
         {
-            SetProperty(ref _currentUser, value);
-            OnPropertyChanged(nameof(CanCreateScheduled));
-            Task.Run(async () => await LoadInspectionsAsync());
+            if (SetProperty(ref _currentUser, value))
+            {
+                OnPropertyChanged(nameof(IsAdmin));
+                Task.Run(async () => await LoadInspectionsAsync());
+            }
         }
     }
 
@@ -56,7 +87,25 @@ public class InspectionsViewModel : ViewModelBase
     public bool IsLoading
     {
         get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
+        set 
+        { 
+            if (SetProperty(ref _isLoading, value))
+            {
+                // Обновляем состояние команд при изменении IsLoading
+                (RefreshCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (GenerateReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+                ApplyFilters();
+        }
     }
 
     public ObservableCollection<string> StatusFilters
@@ -75,43 +124,122 @@ public class InspectionsViewModel : ViewModelBase
         }
     }
 
-    public bool CanCreateScheduled => CurrentUser?.CanManageInspections ?? false;
+    public string FilterStartDateText
+    {
+        get => _filterStartDateText;
+        set
+        {
+            if (SetProperty(ref _filterStartDateText, value))
+            {
+                _filterStartDate = ParseDate(value);
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string FilterEndDateText
+    {
+        get => _filterEndDateText;
+        set
+        {
+            if (SetProperty(ref _filterEndDateText, value))
+            {
+                _filterEndDate = ParseDate(value);
+                ApplyFilters();
+            }
+        }
+    }
+
+    public DateTime? FilterStartDate
+    {
+        get => _filterStartDate;
+        set
+        {
+            if (SetProperty(ref _filterStartDate, value))
+            {
+                _filterStartDateText = value?.ToString("dd.MM.yyyy") ?? string.Empty;
+                OnPropertyChanged(nameof(FilterStartDateText));
+                ApplyFilters();
+            }
+        }
+    }
+
+    public DateTime? FilterEndDate
+    {
+        get => _filterEndDate;
+        set
+        {
+            if (SetProperty(ref _filterEndDate, value))
+            {
+                _filterEndDateText = value?.ToString("dd.MM.yyyy") ?? string.Empty;
+                OnPropertyChanged(nameof(FilterEndDateText));
+                ApplyFilters();
+            }
+        }
+    }
+
+    public bool IsAdmin => CurrentUser?.Role == "Администратор";
 
     public ICommand RefreshCommand { get; }
+    public ICommand SearchCommand { get; }
+    public ICommand GenerateReportCommand { get; }
     public ICommand InspectionClickCommand { get; }
-    public ICommand CreateScheduledInspectionCommand { get; }
+
+    private DateTime? ParseDate(string dateString)
+    {
+        if (string.IsNullOrWhiteSpace(dateString))
+            return null;
+
+        string cleaned = dateString.Trim();
+        cleaned = Regex.Replace(cleaned, @"[\.\-/]", ".");
+
+        if (DateTime.TryParseExact(cleaned, "dd.MM.yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime result))
+        {
+            return result;
+        }
+        return null;
+    }
 
     private async Task LoadInspectionsAsync()
     {
         if (IsLoading) return;
-        IsLoading = true;
+        
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = true);
 
         try
         {
+            ObservableCollection<Inspection> inspections;
+
             if (CurrentUser?.Role == "Администратор")
             {
-                var inspections = await _db.GetAllInspectionsAsync();
-                _allInspections.Clear();
-                foreach (var i in inspections)
-                    _allInspections.Add(i);
+                inspections = await _db.GetAllInspectionsForAdminAsync();
             }
             else if (CurrentUser?.Role == "Инспектор")
             {
-                var inspections = await _db.GetInspectionsForInspectorAsync(CurrentUser.Id);
+                inspections = await _db.GetInspectionsForInspectorAsync(CurrentUser.Id);
+            }
+            else
+            {
+                inspections = await _db.GetAllInspectionsAsync();
+            }
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
                 _allInspections.Clear();
                 foreach (var i in inspections)
                     _allInspections.Add(i);
-            }
 
-            ApplyFilters();
+                ApplyFilters();
+            });
         }
         catch (Exception ex)
         {
             Console.WriteLine($"LoadInspectionsAsync error: {ex.Message}");
+            await ShowError("Ошибка загрузки", $"Не удалось загрузить проверки: {ex.Message}");
         }
         finally
         {
-            IsLoading = false;
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
         }
     }
 
@@ -119,9 +247,26 @@ public class InspectionsViewModel : ViewModelBase
     {
         var filtered = _allInspections.AsEnumerable();
 
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            filtered = filtered.Where(i =>
+                (i.EmployeeName?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (i.ProblemType?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (i.ProblemDescription?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
         if (SelectedStatusFilter != "Все")
         {
             filtered = filtered.Where(i => i.Status == SelectedStatusFilter);
+        }
+
+        if (_filterStartDate.HasValue)
+        {
+            filtered = filtered.Where(i => i.StartDate.Date >= _filterStartDate.Value.Date);
+        }
+        if (_filterEndDate.HasValue)
+        {
+            filtered = filtered.Where(i => i.StartDate.Date <= _filterEndDate.Value.Date);
         }
 
         FilteredInspections.Clear();
@@ -129,41 +274,146 @@ public class InspectionsViewModel : ViewModelBase
             FilteredInspections.Add(i);
     }
 
-    private async void OnInspectionClick(object parameter)
-{
-    if (parameter is Inspection inspection)
+    private async Task ShowInspectionDetails(object? parameter)
     {
-        var box = MsBox.Avalonia.MessageBoxManager.GetMessageBoxStandard(
-            "Детали проверки",
-            $"Проверка #{inspection.Id}\n\n" +
-            $"Тип проблемы: {inspection.ProblemType}\n" +
-            $"Описание: {inspection.ProblemDescription}\n" +
-            $"Инспектор: {inspection.EmployeeName}\n" +
-            $"Статус: {inspection.Status}\n" +
-            $"Начало: {inspection.StartDate:dd.MM.yyyy}",
-            MsBox.Avalonia.Enums.ButtonEnum.Ok);
+        if (parameter is Inspection inspection)
+        {
+            var history = await _db.GetInspectionHistoryAsync(inspection.Id);
+
+            var details = $"ИНФОРМАЦИЯ О ПРОБЛЕМЕ:\n" +
+                $"Тип проблемы: {inspection.ProblemType}\n" +
+                $"Описание: {inspection.ProblemDescription}\n\n" +
+                $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                $"ИНФОРМАЦИЯ О ПРОВЕРКЕ:\n" +
+                $"Инспектор: {inspection.EmployeeName}\n" +
+                $"Дата начала: {inspection.StartDate:dd.MM.yyyy}\n" +
+                $"Дата завершения: {(inspection.EndDate.HasValue ? inspection.EndDate.Value.ToString("dd.MM.yyyy") : "Не завершена")}\n" +
+                $"Статус: {inspection.Status}\n" +
+                $"Результат: {inspection.Result}\n" +
+                $"Комментарий: {(string.IsNullOrEmpty(inspection.Description) ? "Нет комментария" : inspection.Description)}\n\n" +
+                $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                $"ИСТОРИЯ ИЗМЕНЕНИЙ СТАТУСОВ:\n" +
+                $"{history}";
+
+            var box = MessageBoxManager.GetMessageBoxStandard(
+                $"Детали проверки #{inspection.Id}",
+                details,
+                ButtonEnum.Ok);
+            await box.ShowAsync();
+        }
+    }
+
+    private async Task GenerateReportPdfOnly()
+    {
+        try
+        {
+            if (!IsAdmin)
+            {
+                await ShowError("Ошибка", "У вас нет прав для создания отчета");
+                return;
+            }
+
+            if (!_filterStartDate.HasValue || !_filterEndDate.HasValue)
+            {
+                await ShowWarning("Нет периода", "Пожалуйста, укажите даты начала и окончания в фильтрах выше");
+                return;
+            }
+
+            IStorageProvider? storageProvider = null;
+
+            if (_parentWindow != null)
+            {
+                storageProvider = _parentWindow.StorageProvider;
+            }
+
+            if (storageProvider == null && Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                if (desktop.MainWindow != null)
+                {
+                    storageProvider = desktop.MainWindow.StorageProvider;
+                }
+                else if (desktop.Windows.Count > 0)
+                {
+                    storageProvider = desktop.Windows[0].StorageProvider;
+                }
+            }
+
+            if (storageProvider == null)
+            {
+                var tempWindow = new Window
+                {
+                    Width = 1,
+                    Height = 1,
+                    Opacity = 0,
+                    ShowInTaskbar = false
+                };
+                tempWindow.Show();
+                storageProvider = tempWindow.StorageProvider;
+                await Task.Delay(100);
+                tempWindow.Close();
+            }
+
+            if (storageProvider == null)
+            {
+                await ShowError("Ошибка", "Не удалось получить доступ к файловой системе");
+                return;
+            }
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = true);
+
+            var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Сохранить PDF отчет",
+                SuggestedFileName = $"Отчет_по_проверкам_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("PDF файлы") { Patterns = new[] { "*.pdf" } },
+                    new FilePickerFileType("Все файлы") { Patterns = new[] { "*.*" } }
+                }
+            });
+
+            if (file == null)
+            {
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
+                return;
+            }
+
+            string reportPath = file.Path.LocalPath;
+            bool reportSuccess = await _db.GenerateReportAsync(_filterStartDate.Value, _filterEndDate.Value, reportPath);
+            
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
+
+            if (reportSuccess)
+            {
+                var successBox = MessageBoxManager.GetMessageBoxStandard(
+                    "Успешно",
+                    $"PDF отчет успешно сохранен!\n\nПуть: {reportPath}",
+                    ButtonEnum.Ok,
+                    Icon.Success);
+                await successBox.ShowAsync();
+            }
+            else
+            {
+                await ShowWarning("Нет данных", $"За период {_filterStartDate.Value:dd.MM.yyyy} - {_filterEndDate.Value:dd.MM.yyyy} нет проверок для формирования отчета");
+            }
+        }
+        catch (Exception ex)
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
+            await ShowError("Ошибка при сохранении отчета", ex.Message);
+        }
+    }
+
+    private async Task ShowError(string title, string message)
+    {
+        var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Error);
         await box.ShowAsync();
     }
-}
 
-    private async Task CreateScheduledInspection()
+    private async Task ShowWarning(string title, string message)
     {
-        var pipelines = await _db.GetPipelinesAsync();
-        if (!pipelines.Any())
-        {
-            var box = MessageBoxManager.GetMessageBoxStandard("Ошибка", "Нет доступных трубопроводов");
-            await box.ShowAsync();
-            return;
-        }
-
-        var dialog = new CreateInspectionWindow();
-        var viewModel = new CreateInspectionViewModel(_db, CurrentUser?.Id ?? 0);
-        dialog.DataContext = viewModel;
-
-        if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            await dialog.ShowDialog(desktop.MainWindow);
-            await LoadInspectionsAsync();
-        }
+        var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, Icon.Warning);
+        await box.ShowAsync();
     }
 }

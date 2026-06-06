@@ -4,7 +4,7 @@ using Avalonia.Markup.Xaml;
 
 namespace Taneco.Views;
 
-public partial class InspectionsView : Window
+public partial class InspectionsView : UserControl
 {
     public InspectionsView()
     {

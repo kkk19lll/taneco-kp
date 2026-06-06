@@ -1,10 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Npgsql;
 using Taneco.Models;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
+using iText.Layout.Properties;
+using iText.Kernel.Font;
+using iText.IO.Font.Constants;
+using System.IO;
 
 namespace Taneco.Services;
 
@@ -17,37 +25,24 @@ public class DatabaseService
         _connectionString = "Host=localhost;Port=5432;Database=kp;Username=postgres;Password=123;";
     }
 
-    // Метод для проверки наличия запрещенных символов в пароле
     public static bool IsPasswordValid(string password)
     {
         if (string.IsNullOrWhiteSpace(password))
             return false;
-
-        // 1. Проверка длины (минимум 8 символов)
         if (password.Length < 8)
             return false;
-
-        // 2. Запрещенные символы: *, #, ₽, &
         string forbiddenChars = @"\*#₽&";
         if (Regex.IsMatch(password, $"[{forbiddenChars}]"))
             return false;
-
-        // 3. Проверка наличия хотя бы одной цифры
         if (!Regex.IsMatch(password, @"\d"))
             return false;
-
-        // 4. Проверка наличия хотя бы одной заглавной буквы
         if (!Regex.IsMatch(password, @"[A-ZА-Я]"))
             return false;
-
-        // 5. Проверка наличия хотя бы одной строчной буквы
         if (!Regex.IsMatch(password, @"[a-zа-я]"))
             return false;
-
         return true;
     }
 
-    // Метод для получения сообщения об ошибке валидации пароля
     public static string GetPasswordErrorMessage()
     {
         return "Пароль должен содержать минимум 8 символов, включая:\n" +
@@ -57,7 +52,6 @@ public class DatabaseService
                "Пароль не должен содержать специальные символы";
     }
 
-    // Метод для проверки даты приема
     public static bool IsHireDateValid(DateTime hireDate)
     {
         return hireDate.Date <= DateTime.Today;
@@ -351,13 +345,11 @@ public class DatabaseService
         return problems;
     }
 
-    // НОВЫЙ МЕТОД: Получение истории проблемы (линия жизни)
     public async Task<ObservableCollection<ProblemHistoryEvent>> GetProblemHistoryAsync(int problemId)
     {
         var history = new ObservableCollection<ProblemHistoryEvent>();
 
         const string query = @"
-            -- Обнаружение проблемы
             SELECT 
                 'Проблема обнаружена' as Событие,
                 up.Дата_уведомления as Дата,
@@ -369,7 +361,6 @@ public class DatabaseService
             
             UNION ALL
             
-            -- Назначение проверки
             SELECT 
                 'Назначена проверка' as Событие,
                 p.Дата_начала as Дата,
@@ -383,7 +374,6 @@ public class DatabaseService
             
             UNION ALL
             
-            -- Статусы проверки
             SELECT 
                 CONCAT('Статус проверки: ', st.Наименование) as Событие,
                 COALESCE(p.Дата_окончания, p.Дата_начала) as Дата,
@@ -396,7 +386,6 @@ public class DatabaseService
             
             UNION ALL
             
-            -- Ремонт (если был)
             SELECT 
                 CONCAT('Ремонт: ', sr.Наименование) as Событие,
                 r.Дата_начала as Дата,
@@ -412,7 +401,6 @@ public class DatabaseService
             
             UNION ALL
             
-            -- Завершение/отмена
             SELECT 
                 CASE 
                     WHEN st.Код_статуса_проверки = 6 THEN 'Ремонт завершен'
@@ -628,6 +616,322 @@ public class DatabaseService
         {
         }
         return inspections;
+    }
+
+    public async Task<ObservableCollection<Inspection>> GetAllInspectionsForReportAsync()
+    {
+        var inspections = new ObservableCollection<Inspection>();
+        const string query = @"
+            SELECT
+                p.Код_проверки,
+                p.Код_уведом_проб,
+                p.Код_сотр,
+                CONCAT(COALESCE(s.Фамилия, ''), ' ', COALESCE(s.Имя, ''), ' ', COALESCE(s.Отчество, '')) as Сотрудник,
+                p.Дата_начала,
+                p.Дата_окончания,
+                COALESCE(st.Наименование, 'Новая') as Статус,
+                COALESCE(p.Описание, '') as Описание,
+                COALESCE(up.Описание, '') as Проблема_описание,
+                COALESCE(tp.Наименование, 'Неизвестно') as Тип_проблемы
+            FROM Проверка p
+            LEFT JOIN Сотрудник s ON p.Код_сотр = s.Код_сотр
+            LEFT JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+            LEFT JOIN Уведомление_проблемы up ON p.Код_уведом_проб = up.Код_уведом_проб
+            LEFT JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+            ORDER BY p.Дата_начала DESC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                inspections.Add(new Inspection
+                {
+                    Id = reader.GetInt32(0),
+                    ProblemId = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                    EmployeeId = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                    EmployeeName = reader.IsDBNull(3) ? "Не назначен" : reader.GetString(3).Trim(),
+                    StartDate = reader.GetDateTime(4),
+                    EndDate = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
+                    Status = reader.GetString(6),
+                    Description = reader.GetString(7),
+                    ProblemDescription = reader.GetString(8),
+                    ProblemType = reader.GetString(9)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetAllInspectionsForReportAsync error: {ex.Message}");
+        }
+        return inspections;
+    }
+
+    // *** ПОЛНОСТЬЮ ПЕРЕПИСАННЫЙ МЕТОД ДЛЯ ОТЧЕТА - РАБОТАЕТ ****
+    public async Task<bool> GenerateReportAsync(DateTime startDate, DateTime endDate, string savePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(savePath))
+            {
+                Console.WriteLine("GenerateReportAsync error: savePath is null or empty");
+                return false;
+            }
+
+            string directory = Path.GetDirectoryName(savePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var inspections = await GetAllInspectionsForReportAsync();
+
+            var filteredInspections = inspections
+                .Where(i => i.StartDate.Date >= startDate.Date && i.StartDate.Date <= endDate.Date)
+                .ToList();
+
+            if (filteredInspections.Count == 0)
+            {
+                Console.WriteLine("GenerateReportAsync: No inspections found for the date range");
+                return false;
+            }
+
+            // ВАЖНО: ЗАПУСКАЕМ PDF ГЕНЕРАЦИЮ В ОТДЕЛЬНОМ ПОТОКЕ
+            await Task.Run(() => GeneratePdfSync(filteredInspections, startDate, endDate, savePath));
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GenerateReportAsync error: {ex.Message}");
+            Console.WriteLine($"GenerateReportAsync stack trace: {ex.StackTrace}");
+            return false;
+        }
+    }
+
+    // НОВЫЙ СИНХРОННЫЙ МЕТОД ДЛЯ ГЕНЕРАЦИИ PDF
+    private void GeneratePdfSync(List<Inspection> inspections, DateTime startDate, DateTime endDate, string filePath)
+    {
+        // СОЗДАЕМ ФАЙЛ
+        using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            using (var writer = new PdfWriter(fs))
+            {
+                using (var pdf = new PdfDocument(writer))
+                {
+                    var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4);
+                    document.SetMargins(50, 50, 50, 50);
+
+                    // ШРИФТЫ
+                    var titleFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+                    var regularFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+                    var boldFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+
+                    // ЗАГОЛОВОК
+                    var title = new Paragraph("ОТЧЕТ ПО ПРОВЕРКАМ")
+                        .SetFont(titleFont)
+                        .SetFontSize(18)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginBottom(10);
+                    document.Add(title);
+
+                    // ПЕРИОД
+                    var period = new Paragraph($"Период: {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy}")
+                        .SetFont(regularFont)
+                        .SetFontSize(11)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginBottom(5);
+                    document.Add(period);
+
+                    // ДАТА ФОРМИРОВАНИЯ
+                    var generatedDate = new Paragraph($"Дата формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}")
+                        .SetFont(regularFont)
+                        .SetFontSize(11)
+                        .SetTextAlignment(TextAlignment.CENTER)
+                        .SetMarginBottom(20);
+                    document.Add(generatedDate);
+
+                    // ЛИНИЯ
+                    document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
+
+                    // СТАТИСТИКА
+                    int completed = inspections.Count(i => i.Status == "Завершена");
+                    int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
+                    int planned = inspections.Count(i => i.Status == "Запланирована");
+                    int cancelled = inspections.Count(i => i.Status == "Отменена");
+                    int delayed = inspections.Count(i => i.Status == "Отложена");
+
+                    var statsTitle = new Paragraph("СТАТИСТИКА ПО СТАТУСАМ:")
+                        .SetFont(boldFont)
+                        .SetFontSize(12)
+                        .SetMarginTop(15)
+                        .SetMarginBottom(10);
+                    document.Add(statsTitle);
+
+                    var statsText = new Paragraph($"• Завершено: {completed}\n• В процессе: {inProgress}\n• Запланировано: {planned}\n• Отменено: {cancelled}\n• Отложено: {delayed}")
+                        .SetFont(regularFont)
+                        .SetFontSize(11)
+                        .SetMarginBottom(15);
+                    document.Add(statsText);
+
+                    // ЛИНИЯ
+                    document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
+
+                    // СПИСОК ПРОВЕРОК
+                    var listTitle = new Paragraph($"ПОДРОБНЫЙ СПИСОК ПРОВЕРОК (всего: {inspections.Count})")
+                        .SetFont(boldFont)
+                        .SetFontSize(12)
+                        .SetMarginTop(15)
+                        .SetMarginBottom(10);
+                    document.Add(listTitle);
+
+                    int num = 1;
+                    foreach (var inv in inspections)
+                    {
+                        var inspectionBlock = new Paragraph()
+                            .SetFont(regularFont)
+                            .SetFontSize(10)
+                            .SetMarginBottom(10);
+
+                        inspectionBlock.Add(new Paragraph($"[{num}] Проверка #{inv.Id}").SetFont(boldFont).SetFontSize(11));
+                        inspectionBlock.Add(new Paragraph($"   Тип проблемы:    {inv.ProblemType}"));
+                        inspectionBlock.Add(new Paragraph($"   Описание:        {TruncateText(inv.ProblemDescription, 80)}"));
+                        inspectionBlock.Add(new Paragraph($"   Инспектор:       {inv.EmployeeName}"));
+                        inspectionBlock.Add(new Paragraph($"   Дата начала:     {inv.StartDate:dd.MM.yyyy}"));
+                        inspectionBlock.Add(new Paragraph($"   Дата окончания:  {(inv.EndDate.HasValue ? inv.EndDate.Value.ToString("dd.MM.yyyy") : "Не завершена")}"));
+                        inspectionBlock.Add(new Paragraph($"   Статус:          {inv.Status}"));
+                        if (!string.IsNullOrEmpty(inv.Description))
+                        {
+                            inspectionBlock.Add(new Paragraph($"   Комментарий:     {TruncateText(inv.Description, 80)}"));
+                        }
+                        inspectionBlock.Add(new Paragraph("   " + new string('-', 50)));
+
+                        document.Add(inspectionBlock);
+                        num++;
+                    }
+
+                    // ПОДВАЛ
+                    document.Add(new Paragraph("\n" + new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
+                    document.Add(new Paragraph("КОНЕЦ ОТЧЕТА").SetFont(boldFont).SetFontSize(10).SetTextAlignment(TextAlignment.CENTER));
+                    document.Add(new Paragraph(new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
+
+                    document.Close();
+                }
+            }
+        }
+    }
+
+    private async Task SaveAsPdfWithIText7(List<Inspection> inspections, DateTime startDate, DateTime endDate, string filePath)
+    {
+        await Task.Run(() =>
+        {
+            using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using (var writer = new PdfWriter(fs))
+                {
+                    using (var pdf = new PdfDocument(writer))
+                    {
+                        var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4);
+                        document.SetMargins(50, 50, 50, 50);
+
+                        var titleFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+                        var regularFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+                        var boldFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+
+                        var title = new Paragraph("ОТЧЕТ ПО ПРОВЕРКАМ")
+                            .SetFont(titleFont)
+                            .SetFontSize(18)
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetMarginBottom(10);
+                        document.Add(title);
+
+                        var period = new Paragraph($"Период: {startDate:dd.MM.yyyy} - {endDate:dd.MM.yyyy}")
+                            .SetFont(regularFont)
+                            .SetFontSize(11)
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetMarginBottom(5);
+                        document.Add(period);
+
+                        var generatedDate = new Paragraph($"Дата формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}")
+                            .SetFont(regularFont)
+                            .SetFontSize(11)
+                            .SetTextAlignment(TextAlignment.CENTER)
+                            .SetMarginBottom(20);
+                        document.Add(generatedDate);
+
+                        document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
+
+                        int completed = inspections.Count(i => i.Status == "Завершена");
+                        int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
+                        int planned = inspections.Count(i => i.Status == "Запланирована");
+                        int cancelled = inspections.Count(i => i.Status == "Отменена");
+                        int delayed = inspections.Count(i => i.Status == "Отложена");
+
+                        var statsTitle = new Paragraph("СТАТИСТИКА ПО СТАТУСАМ:")
+                            .SetFont(boldFont)
+                            .SetFontSize(12)
+                            .SetMarginTop(15)
+                            .SetMarginBottom(10);
+                        document.Add(statsTitle);
+
+                        var statsText = new Paragraph($"• Завершено: {completed}\n• В процессе: {inProgress}\n• Запланировано: {planned}\n• Отменено: {cancelled}\n• Отложено: {delayed}")
+                            .SetFont(regularFont)
+                            .SetFontSize(11)
+                            .SetMarginBottom(15);
+                        document.Add(statsText);
+
+                        document.Add(new LineSeparator(new iText.Kernel.Pdf.Canvas.Draw.SolidLine()));
+
+                        var listTitle = new Paragraph($"ПОДРОБНЫЙ СПИСОК ПРОВЕРОК (всего: {inspections.Count})")
+                            .SetFont(boldFont)
+                            .SetFontSize(12)
+                            .SetMarginTop(15)
+                            .SetMarginBottom(10);
+                        document.Add(listTitle);
+
+                        int num = 1;
+                        foreach (var inv in inspections)
+                        {
+                            var inspectionBlock = new Paragraph()
+                                .SetFont(regularFont)
+                                .SetFontSize(10)
+                                .SetMarginBottom(10);
+
+                            inspectionBlock.Add(new Paragraph($"[{num}] Проверка #{inv.Id}").SetFont(boldFont).SetFontSize(11));
+                            inspectionBlock.Add(new Paragraph($"   Тип проблемы:    {inv.ProblemType}"));
+                            inspectionBlock.Add(new Paragraph($"   Описание:        {TruncateText(inv.ProblemDescription, 80)}"));
+                            inspectionBlock.Add(new Paragraph($"   Инспектор:       {inv.EmployeeName}"));
+                            inspectionBlock.Add(new Paragraph($"   Дата начала:     {inv.StartDate:dd.MM.yyyy}"));
+                            inspectionBlock.Add(new Paragraph($"   Дата окончания:  {(inv.EndDate.HasValue ? inv.EndDate.Value.ToString("dd.MM.yyyy") : "Не завершена")}"));
+                            inspectionBlock.Add(new Paragraph($"   Статус:          {inv.Status}"));
+                            if (!string.IsNullOrEmpty(inv.Description))
+                            {
+                                inspectionBlock.Add(new Paragraph($"   Комментарий:     {TruncateText(inv.Description, 80)}"));
+                            }
+                            inspectionBlock.Add(new Paragraph("   " + new string('-', 50)));
+
+                            document.Add(inspectionBlock);
+                            num++;
+                        }
+
+                        document.Add(new Paragraph("\n" + new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
+                        document.Add(new Paragraph("КОНЕЦ ОТЧЕТА").SetFont(boldFont).SetFontSize(10).SetTextAlignment(TextAlignment.CENTER));
+                        document.Add(new Paragraph(new string('=', 70)).SetTextAlignment(TextAlignment.CENTER));
+
+                        document.Close();
+                    }
+                }
+            }
+        });
+    }
+
+    private string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "—";
+        if (text.Length <= maxLength) return text;
+        return text.Substring(0, maxLength - 3) + "...";
     }
 
     public async Task<bool> CreateInspectionAsync(int problemId, int employeeId, string description, string urgency)
@@ -1956,7 +2260,6 @@ public class DatabaseService
         return null;
     }
 
-    // НОВЫЙ МЕТОД: Получение доступных отделов
     public async Task<List<string>> GetDepartmentsAsync()
     {
         var departments = new List<string>();
@@ -1976,7 +2279,6 @@ public class DatabaseService
         return departments;
     }
 
-    // НОВЫЙ МЕТОД: Получение доступных должностей по роли
     public async Task<List<string>> GetPositionsByRoleAsync(string role)
     {
         var positions = new List<string>();
@@ -2012,5 +2314,174 @@ public class DatabaseService
             Console.WriteLine($"RestoreEmployeeAsync error: {ex.Message}");
             return false;
         }
+    }
+
+    public async Task<ObservableCollection<Inspection>> GetAllInspectionsForAdminAsync()
+    {
+        var inspections = new ObservableCollection<Inspection>();
+        const string query = @"
+        SELECT
+            p.Код_проверки,
+            p.Код_уведом_проб,
+            p.Код_сотр,
+            CONCAT(s.Фамилия, ' ', s.Имя, ' ', COALESCE(s.Отчество, '')) as Сотрудник,
+            p.Дата_начала,
+            p.Дата_окончания,
+            st.Наименование as Статус,
+            p.Описание,
+            up.Описание as Проблема_описание,
+            tp.Наименование as Тип_проблемы,
+            up.Дата_уведомления,
+            up.Время_уведомления
+        FROM Проверка p
+        JOIN Сотрудник s ON p.Код_сотр = s.Код_сотр
+        JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+        JOIN Уведомление_проблемы up ON p.Код_уведом_проб = up.Код_уведом_проб
+        JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+        ORDER BY p.Дата_начала DESC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                inspections.Add(new Inspection
+                {
+                    Id = reader.GetInt32(0),
+                    ProblemId = reader.GetInt32(1),
+                    EmployeeId = reader.GetInt32(2),
+                    EmployeeName = reader.GetString(3),
+                    StartDate = reader.GetDateTime(4),
+                    EndDate = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
+                    Status = reader.GetString(6),
+                    Description = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    ProblemDescription = reader.GetString(8),
+                    ProblemType = reader.GetString(9)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetAllInspectionsForAdminAsync error: {ex.Message}");
+        }
+        return inspections;
+    }
+
+    public async Task<string> GetInspectionHistoryAsync(int inspectionId)
+    {
+        var history = "";
+        const string query = @"
+        SELECT 
+            p.Дата_начала as Дата_изменения,
+            NULL::time as Время_изменения,
+            st.Наименование as Статус,
+            COALESCE(p.Описание, '') as Комментарий,
+            1 as Порядок
+        FROM Проверка p
+        JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+        WHERE p.Код_проверки = @inspectionId
+        
+        UNION ALL
+        
+        SELECT 
+            p.Дата_окончания as Дата_изменения,
+            NULL::time as Время_изменения,
+            CONCAT('Завершено: ', st.Наименование) as Статус,
+            COALESCE(p.Описание, '') as Комментарий,
+            2 as Порядок
+        FROM Проверка p
+        JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+        WHERE p.Код_проверки = @inspectionId
+        AND p.Дата_окончания IS NOT NULL
+        
+        ORDER BY Дата_изменения ASC, Порядок ASC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@inspectionId", inspectionId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            bool hasRows = false;
+            while (await reader.ReadAsync())
+            {
+                hasRows = true;
+                var changeDate = reader.GetDateTime(0);
+                var status = reader.GetString(2);
+                var comment = reader.GetString(3);
+                history += $"• {changeDate:dd.MM.yyyy} → {status}";
+                if (!string.IsNullOrEmpty(comment))
+                    history += $" (Комментарий: {comment})";
+                history += "\n";
+            }
+
+            if (!hasRows)
+            {
+                const string currentStatusQuery = @"
+                SELECT st.Наименование, p.Дата_начала
+                FROM Проверка p
+                JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+                WHERE p.Код_проверки = @inspectionId";
+
+                await using var cmd2 = new NpgsqlCommand(currentStatusQuery, conn);
+                cmd2.Parameters.AddWithValue("@inspectionId", inspectionId);
+                await using var reader2 = await cmd2.ExecuteReaderAsync();
+                if (await reader2.ReadAsync())
+                {
+                    history = $"• {reader2.GetDateTime(1):dd.MM.yyyy} → {reader2.GetString(0)} (Текущий статус)\n";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetInspectionHistoryAsync error: {ex.Message}");
+            history = "История изменений статуса недоступна\n";
+        }
+        return string.IsNullOrEmpty(history) ? "Нет записей об изменениях статуса\n" : history;
+    }
+
+    public async Task<ObservableCollection<Inspection>> GetEquipmentForReportAsync()
+    {
+        var equipment = new ObservableCollection<Inspection>();
+        const string query = @"
+        SELECT DISTINCT
+            d.Код_датчика,
+            CONCAT(m.Наименование, ' - ', COALESCE(t.Наименование, 'Не установлен')) as Название,
+            0 as Код_уведом_проб,
+            '' as Сотрудник,
+            CURRENT_DATE as Дата_начала,
+            NULL as Дата_окончания,
+            '' as Статус,
+            '' as Описание,
+            '' as Проблема_описание,
+            '' as Тип_проблемы
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        ORDER BY m.Наименование";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                equipment.Add(new Inspection
+                {
+                    Id = reader.GetInt32(0),
+                    EmployeeName = reader.GetString(1)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetEquipmentForReportAsync error: {ex.Message}");
+        }
+        return equipment;
     }
 }
