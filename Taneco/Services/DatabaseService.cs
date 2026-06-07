@@ -754,7 +754,7 @@ public class DatabaseService
                         {
                             statsCol.Spacing(5);
                             statsCol.Item().Text("СТАТИСТИКА ПО СТАТУСАМ:").Bold().FontSize(13);
-                            
+
                             int completed = inspections.Count(i => i.Status == "Завершена");
                             int inProgress = inspections.Count(i => i.Status == "В процессе выполнения");
                             int planned = inspections.Count(i => i.Status == "Запланирована");
@@ -811,18 +811,18 @@ public class DatabaseService
                             foreach (var inv in inspections)
                             {
                                 var rowColor = num % 2 == 0 ? Colors.Grey.Lighten3 : Colors.White;
-                                
+
                                 table.Cell().Background(rowColor).Padding(4).Text(num.ToString()).AlignCenter();
                                 table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.ProblemType, 25));
                                 table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.ProblemDescription, 40));
                                 table.Cell().Background(rowColor).Padding(4).Text(TruncateText(inv.EmployeeName, 20));
                                 table.Cell().Background(rowColor).Padding(4).Text(inv.StartDate.ToString("dd.MM.yyyy")).AlignCenter();
                                 table.Cell().Background(rowColor).Padding(4).Text(inv.EndDate?.ToString("dd.MM.yyyy") ?? "—").AlignCenter();
-                                
+
                                 table.Cell().Background(rowColor).Padding(4).Text(inv.Status)
                                     .FontColor(GetStatusColor(inv.Status))
                                     .SemiBold();
-                                
+
                                 num++;
                             }
                         });
@@ -2426,5 +2426,353 @@ public class DatabaseService
             Console.WriteLine($"GetEquipmentForReportAsync error: {ex.Message}");
         }
         return equipment;
+    }
+
+    public async Task<ObservableCollection<SensorForDropdown>> GetSensorsForDropdownAsync()
+    {
+        var sensors = new ObservableCollection<SensorForDropdown>();
+        const string query = @"
+        SELECT 
+            d.Код_датчика,
+            CONCAT(m.Наименование, ' (', td.Наименование, ') - ', COALESCE(t.Наименование, 'Не установлен')) as Название
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        ORDER BY m.Наименование";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                sensors.Add(new SensorForDropdown
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetSensorsForDropdownAsync error: {ex.Message}");
+        }
+        return sensors;
+    }
+
+    public async Task<EquipmentForReport?> GetEquipmentReportByIdAsync(int equipmentId)
+    {
+        const string query = @"
+    SELECT 
+        d.Код_датчика,
+        m.Наименование as Модель,
+        p.Наименование as Производитель,
+        COALESCE(p.Страна, '') as Страна,
+        td.Наименование as Тип,
+        COALESCE(dt.Местоположение, 'Не указано') as Местоположение,
+        COALESCE(t.Наименование, 'Не установлен') as Трубопровод,
+        ei.Наименование as Единица_измерения,
+        rd.Минимальное_значение,
+        rd.Максимальное_значение,
+        COALESCE(dim.Наименование, '') as Измерение,
+        d.Год_выпуска,
+        d.Дата_последней_поверки,
+        COALESCE(d.Точка_контроля, '') as Точка_контроля,
+        (
+            SELECT z.Текущее_значение 
+            FROM Замер z 
+            JOIN Датчик_трубопровод dt2 ON z.Код_дат_труб = dt2.Код_дат_труб
+            WHERE dt2.Код_датчика = d.Код_датчика 
+            ORDER BY z.Дата_замера DESC, z.Время_замера DESC 
+            LIMIT 1
+        ) as Последнее_значение,
+        (
+            SELECT CONCAT(TO_CHAR(z.Дата_замера, 'DD.MM.YYYY'), ' ', z.Время_замера)
+            FROM Замер z 
+            JOIN Датчик_трубопровод dt2 ON z.Код_дат_труб = dt2.Код_дат_труб
+            WHERE dt2.Код_датчика = d.Код_датчика 
+            ORDER BY z.Дата_замера DESC, z.Время_замера DESC 
+            LIMIT 1
+        ) as Дата_время_последнего_замера,
+        (
+            SELECT string_agg(repair_info, ', ')
+            FROM (
+                SELECT CONCAT(sr.Наименование, ' (', TO_CHAR(r.Дата_начала, 'DD.MM.YYYY'), ')') as repair_info
+                FROM Ремонт r
+                JOIN Проверка p2 ON r.Код_проверки = p2.Код_проверки
+                JOIN Уведомление_проблемы up ON p2.Код_уведом_проб = up.Код_уведом_проб
+                JOIN Замер z ON up.Код_замера = z.Код_замера
+                JOIN Датчик_трубопровод dt2 ON z.Код_дат_труб = dt2.Код_дат_труб
+                JOIN Статус_ремонта sr ON r.Код_статуса_ремонта = sr.Код_статуса_ремонта
+                WHERE dt2.Код_датчика = d.Код_датчика 
+                ORDER BY r.Дата_начала DESC 
+                LIMIT 3
+            ) sub
+        ) as Последние_ремонты
+    FROM Датчик d
+    JOIN Модель m ON d.Код_модели = m.Код_модели
+    JOIN Производитель p ON m.Код_производ = p.Код_производ
+    JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+    JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+    JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+    JOIN Особенности_измерения oi ON d.Код_особ_измер_дат = oi.Код_особ_измер_дат
+    JOIN Единица_измерения ei ON oi.Код_ед_измер = ei.Код_ед_измер
+    JOIN Измерение_датчика dim ON oi.Код_измер_дат = dim.Код_измер_дат
+    LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+    LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+    WHERE d.Код_датчика = @equipmentId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@equipmentId", equipmentId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                var equipment = new EquipmentForReport();
+                equipment.Id = reader.GetInt32(0);
+                equipment.Model = reader.GetString(1);
+                equipment.Manufacturer = reader.GetString(2);
+                equipment.ManufacturerCountry = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                equipment.Type = reader.GetString(4);
+                equipment.InstallationLocation = reader.IsDBNull(5) ? "" : reader.GetString(5);
+                equipment.PipelineName = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                equipment.Unit = reader.IsDBNull(7) ? "" : reader.GetString(7);
+                equipment.MinThreshold = reader.GetDecimal(8);
+                equipment.MaxThreshold = reader.GetDecimal(9);
+                equipment.MeasurementType = reader.IsDBNull(10) ? "" : reader.GetString(10);
+                equipment.ProductionYear = reader.IsDBNull(11) ? null : reader.GetInt32(11);
+                equipment.LastCalibration = reader.IsDBNull(12) ? null : reader.GetDateTime(12);
+                equipment.ControlPoint = reader.IsDBNull(13) ? "" : reader.GetString(13);
+                equipment.LastMeasurementValue = reader.IsDBNull(14) ? null : reader.GetDecimal(14);
+
+                if (!reader.IsDBNull(15))
+                {
+                    string dateTimeStr = reader.GetString(15);
+                    if (DateTime.TryParse(dateTimeStr, out DateTime parsedDate))
+                    {
+                        equipment.LastMeasurementDate = parsedDate;
+                    }
+                }
+
+                equipment.LastRepairDescription = reader.IsDBNull(16) ? "Нет данных о ремонтах" : reader.GetString(16);
+                equipment.Name = $"{equipment.Model} ({equipment.Type})";
+
+                return equipment;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetEquipmentReportByIdAsync error: {ex.Message}");
+        }
+        return null;
+    }
+
+    public async Task<SensorStatisticsResult> GetSensorStatisticsByIdAsync(int sensorId, DateTime startDate, DateTime endDate)
+    {
+        var stats = new SensorStatisticsResult
+        {
+            StartDate = startDate,
+            EndDate = endDate,
+            DailyStats = new List<SensorDailyStat>()
+        };
+
+        const string query = @"
+        SELECT 
+            COUNT(*) as TotalMeasurements,
+            COUNT(DISTINCT up.Код_уведом_проб) as Problems,
+            COALESCE(AVG(z.Текущее_значение), 0) as AvgValue
+        FROM Замер z
+        JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+        LEFT JOIN Уведомление_проблемы up ON z.Код_замера = up.Код_замера
+        WHERE dt.Код_датчика = @sensorId 
+            AND z.Дата_замера BETWEEN @startDate AND @endDate";
+
+        const string dailyQuery = @"
+        SELECT 
+            z.Дата_замера,
+            COALESCE(AVG(z.Текущее_значение), 0) as AvgValue,
+            COUNT(*) as MeasurementCount,
+            COUNT(DISTINCT up.Код_уведом_проб) as ProblemCount
+        FROM Замер z
+        JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+        LEFT JOIN Уведомление_проблемы up ON z.Код_замера = up.Код_замера
+        WHERE dt.Код_датчика = @sensorId 
+            AND z.Дата_замера BETWEEN @startDate AND @endDate
+        GROUP BY z.Дата_замера
+        ORDER BY z.Дата_замера";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@sensorId", sensorId);
+            cmd.Parameters.AddWithValue("@startDate", startDate);
+            cmd.Parameters.AddWithValue("@endDate", endDate);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                stats.TotalMeasurements = reader.GetInt32(0);
+                stats.ProblemCount = reader.GetInt32(1);
+                stats.AverageValue = reader.GetDecimal(2);
+            }
+            await reader.CloseAsync();
+
+            await using var dailyCmd = new NpgsqlCommand(dailyQuery, conn);
+            dailyCmd.Parameters.AddWithValue("@sensorId", sensorId);
+            dailyCmd.Parameters.AddWithValue("@startDate", startDate);
+            dailyCmd.Parameters.AddWithValue("@endDate", endDate);
+            await using var dailyReader = await dailyCmd.ExecuteReaderAsync();
+            while (await dailyReader.ReadAsync())
+            {
+                stats.DailyStats.Add(new SensorDailyStat
+                {
+                    Date = dailyReader.GetDateTime(0),
+                    AverageValue = dailyReader.GetDecimal(1),
+                    MeasurementCount = dailyReader.GetInt32(2),
+                    ProblemCount = dailyReader.GetInt32(3)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetSensorStatisticsByIdAsync error: {ex.Message}");
+        }
+        return stats;
+    }
+
+    public async Task<ComprehensiveReport> GetComprehensiveReportAsync(DateTime startDate, DateTime endDate)
+    {
+        var report = new ComprehensiveReport
+        {
+            StartDate = startDate,
+            EndDate = endDate,
+            GeneratedAt = DateTime.Now,
+            EquipmentList = new List<EquipmentForReport>(),
+            ProblemSummary = new List<ProblemSummary>()
+        };
+
+        const string equipmentQuery = @"
+        SELECT 
+            d.Код_датчика,
+            m.Наименование as Модель,
+            p.Наименование as Производитель,
+            COALESCE(p.Страна, '') as Страна,
+            td.Наименование as Тип,
+            COALESCE(dt.Местоположение, 'Не указано') as Местоположение,
+            COALESCE(t.Наименование, 'Не установлен') as Трубопровод,
+            ei.Наименование as Единица_измерения,
+            rd.Минимальное_значение,
+            rd.Максимальное_значение,
+            COALESCE(dim.Наименование, '') as Измерение,
+            d.Год_выпуска,
+            d.Дата_последней_поверки,
+            COALESCE(d.Точка_контроля, '') as Точка_контроля
+        FROM Датчик d
+        JOIN Модель m ON d.Код_модели = m.Код_модели
+        JOIN Производитель p ON m.Код_производ = p.Код_производ
+        JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        JOIN Тип_датчика td ON od.Код_типа_дат = td.Код_типа_дат
+        JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        JOIN Особенности_измерения oi ON d.Код_особ_измер_дат = oi.Код_особ_измер_дат
+        JOIN Единица_измерения ei ON oi.Код_ед_измер = ei.Код_ед_измер
+        JOIN Измерение_датчика dim ON oi.Код_измер_дат = dim.Код_измер_дат
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода";
+
+        const string summaryQuery = @"
+        SELECT 
+            COUNT(DISTINCT d.Код_датчика) as TotalSensors,
+            COUNT(DISTINCT z.Код_замера) as TotalMeasurements,
+            COUNT(DISTINCT up.Код_уведом_проб) as TotalProblems,
+            COUNT(DISTINCT p.Код_проверки) as TotalInspections,
+            COUNT(DISTINCT r.Код_ремонта) as TotalRepairs,
+            COALESCE(AVG(z.Текущее_значение), 0) as AvgMeasurementValue
+        FROM Датчик d
+        LEFT JOIN Датчик_трубопровод dt ON d.Код_датчика = dt.Код_датчика
+        LEFT JOIN Замер z ON dt.Код_дат_труб = z.Код_дат_труб AND z.Дата_замера BETWEEN @startDate AND @endDate
+        LEFT JOIN Уведомление_проблемы up ON z.Код_замера = up.Код_замера
+        LEFT JOIN Проверка p ON up.Код_уведом_проб = p.Код_уведом_проб
+        LEFT JOIN Ремонт r ON p.Код_проверки = r.Код_проверки";
+
+        const string problemSummaryQuery = @"
+        SELECT 
+            tp.Наименование as ProblemType,
+            COUNT(*) as Count,
+            COALESCE(tp.Категория_риска, 'Средний') as RiskCategory
+        FROM Уведомление_проблемы up
+        JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+        WHERE up.Дата_уведомления BETWEEN @startDate AND @endDate
+        GROUP BY tp.Наименование, tp.Категория_риска
+        ORDER BY Count DESC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            await using var summaryCmd = new NpgsqlCommand(summaryQuery, conn);
+            summaryCmd.Parameters.AddWithValue("@startDate", startDate);
+            summaryCmd.Parameters.AddWithValue("@endDate", endDate);
+            await using var summaryReader = await summaryCmd.ExecuteReaderAsync();
+            if (await summaryReader.ReadAsync())
+            {
+                report.TotalSensors = summaryReader.GetInt32(0);
+                report.TotalMeasurements = summaryReader.GetInt32(1);
+                report.TotalProblems = summaryReader.GetInt32(2);
+                report.TotalInspections = summaryReader.GetInt32(3);
+                report.TotalRepairs = summaryReader.GetInt32(4);
+                report.AverageMeasurementValue = summaryReader.GetDecimal(5);
+            }
+            await summaryReader.CloseAsync();
+
+            await using var equipmentCmd = new NpgsqlCommand(equipmentQuery, conn);
+            await using var equipmentReader = await equipmentCmd.ExecuteReaderAsync();
+            while (await equipmentReader.ReadAsync())
+            {
+                var equipment = new EquipmentForReport();
+                equipment.Id = equipmentReader.GetInt32(0);
+                equipment.Model = equipmentReader.GetString(1);
+                equipment.Manufacturer = equipmentReader.GetString(2);
+                equipment.ManufacturerCountry = equipmentReader.GetString(3);
+                equipment.Type = equipmentReader.GetString(4);
+                equipment.InstallationLocation = equipmentReader.GetString(5);
+                equipment.PipelineName = equipmentReader.GetString(6);
+                equipment.Unit = equipmentReader.GetString(7);
+                equipment.MinThreshold = equipmentReader.GetDecimal(8);
+                equipment.MaxThreshold = equipmentReader.GetDecimal(9);
+                equipment.MeasurementType = equipmentReader.GetString(10);
+                equipment.ProductionYear = equipmentReader.IsDBNull(11) ? null : equipmentReader.GetInt32(11);
+                equipment.LastCalibration = equipmentReader.IsDBNull(12) ? null : equipmentReader.GetDateTime(12);
+                equipment.ControlPoint = equipmentReader.GetString(13);
+                equipment.Name = $"{equipment.Model} ({equipment.Type})";
+                report.EquipmentList.Add(equipment);
+            }
+            await equipmentReader.CloseAsync();
+
+            await using var problemCmd = new NpgsqlCommand(problemSummaryQuery, conn);
+            problemCmd.Parameters.AddWithValue("@startDate", startDate);
+            problemCmd.Parameters.AddWithValue("@endDate", endDate);
+            await using var problemReader = await problemCmd.ExecuteReaderAsync();
+            while (await problemReader.ReadAsync())
+            {
+                report.ProblemSummary.Add(new ProblemSummary
+                {
+                    ProblemType = problemReader.GetString(0),
+                    Count = problemReader.GetInt32(1),
+                    RiskCategory = problemReader.GetString(2)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetComprehensiveReportAsync error: {ex.Message}");
+        }
+        return report;
     }
 }
