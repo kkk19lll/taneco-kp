@@ -13,13 +13,36 @@
 
     <ScrollViewer>
         <StackPanel Margin="15">
+            <!--  Заголовок виден аналитику или администратору  -->
             <TextBlock
                 Margin="0,0,0,15"
                 Classes="h1"
+                IsVisible="{Binding CanViewReports}"
                 Text="Отчеты и аналитика" />
 
-            <!--  Отчёт по оборудованию  -->
-            <Border Margin="0,0,0,15" Classes="card">
+            <!--  Сообщение для пользователей без прав  -->
+            <Border
+                Margin="0,0,0,15"
+                Classes="card"
+                IsVisible="{Binding !CanViewReports}">
+                <StackPanel>
+                    <TextBlock
+                        Margin="0,0,0,10"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        Text="Доступ запрещен" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Text="У вас нет прав для просмотра отчетов и аналитики. Обратитесь к администратору." />
+                </StackPanel>
+            </Border>
+
+            <!--  Отчёт по оборудованию - для аналитика/администратора  -->
+            <Border
+                Margin="0,0,0,15"
+                Classes="card"
+                IsVisible="{Binding CanViewReports}">
                 <StackPanel>
                     <TextBlock
                         Margin="0,0,0,5"
@@ -46,13 +69,16 @@
                 </StackPanel>
             </Border>
 
-            <!--  Статистика по оборудованию  -->
-            <Border Margin="0,0,0,15" Classes="card">
+            <!--  Статистика по датчикам - для аналитика/администратора  -->
+            <Border
+                Margin="0,0,0,15"
+                Classes="card"
+                IsVisible="{Binding CanViewReports}">
                 <StackPanel>
                     <TextBlock
                         Margin="0,0,0,5"
                         Classes="h3"
-                        Text="Статистика по оборудованию" />
+                        Text="Статистика по датчикам" />
                     <TextBlock
                         Margin="0,0,0,10"
                         FontSize="11"
@@ -64,7 +90,6 @@
                         ItemsSource="{Binding Sensors}"
                         SelectedItem="{Binding SelectedSensor}" />
 
-                    <!--  Поля ввода даты с маской  -->
                     <Grid Margin="0,0,0,10" ColumnDefinitions="*,*">
                         <StackPanel Grid.Column="0" Margin="0,0,10,0">
                             <TextBlock
@@ -98,8 +123,11 @@
                 </StackPanel>
             </Border>
 
-            <!--  Сводные отчёты  -->
-            <Border Margin="0,0,0,15" Classes="card">
+            <!--  Сводные отчёты - для аналитика/администратора  -->
+            <Border
+                Margin="0,0,0,15"
+                Classes="card"
+                IsVisible="{Binding CanViewReports}">
                 <StackPanel>
                     <TextBlock
                         Margin="0,0,0,5"
@@ -151,7 +179,149 @@
                 </StackPanel>
             </Border>
 
-            <!--  Результат  -->
+            <!--  Отчёт по персоналу - ТОЛЬКО ДЛЯ АНАЛИТИКА  -->
+            <Border
+                Margin="0,0,0,15"
+                Classes="card"
+                IsVisible="{Binding CanViewPersonnelReports}">
+                <StackPanel>
+                    <TextBlock
+                        Margin="0,0,0,5"
+                        Classes="h3"
+                        Text="Отчёт по персоналу" />
+                    <TextBlock
+                        Margin="0,0,0,10"
+                        FontSize="11"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Text="Выберите сотрудников и информацию для отображения в отчёте" />
+
+                    <!--  Выбор периода  -->
+                    <Grid Margin="0,0,0,10" ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Дата начала (дд.мм.гггг)" />
+                            <TextBox
+                                MaxLength="10"
+                                Text="{Binding PersonnelStartDateString, Mode=TwoWay}"
+                                Watermark="дд.мм.гггг" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Дата окончания (дд.мм.гггг)" />
+                            <TextBox
+                                MaxLength="10"
+                                Text="{Binding PersonnelEndDateString, Mode=TwoWay}"
+                                Watermark="дд.мм.гггг" />
+                        </StackPanel>
+                    </Grid>
+
+                    
+                    <Grid Margin="0,0,0,10" ColumnDefinitions="*,Auto,*">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Доступные сотрудники:" />
+                            <ListBox
+                                Height="150"
+                                DisplayMemberBinding="{Binding FullName}"
+                                ItemsSource="{Binding AllEmployees}"
+                                SelectedItem="{Binding SelectedEmployeeFromList}" />
+                            <Button
+                                Margin="0,5,0,0"
+                                Command="{Binding SelectAllEmployeesCommand}"
+                                Content="Выбрать всех" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="1"
+                            Margin="10,0"
+                            VerticalAlignment="Center">
+                            <Button
+                                Margin="0,5"
+                                Command="{Binding AddEmployeeToReportCommand}"
+                                Content="→" />
+                            <Button
+                                Margin="0,5"
+                                Command="{Binding RemoveEmployeeFromReportCommand}"
+                                Content="←" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Выбранные сотрудники:" />
+                            <ListBox
+                                Height="150"
+                                DisplayMemberBinding="{Binding FullName}"
+                                ItemsSource="{Binding SelectedEmployees}"
+                                SelectedItem="{Binding SelectedEmployeeFromSelected}" />
+                            <Button
+                                Margin="0,5,0,0"
+                                Command="{Binding ClearEmployeesCommand}"
+                                Content="Очистить" />
+                        </StackPanel>
+                    </Grid>
+
+                    
+                    <Grid Margin="0,0,0,10" ColumnDefinitions="*,Auto,*">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Доступные поля:" />
+                            <ListBox
+                                Height="150"
+                                ItemsSource="{Binding AvailableColumns}"
+                                SelectedItem="{Binding SelectedAvailableColumn}" />
+                            <Button
+                                Margin="0,5,0,0"
+                                Command="{Binding SelectAllColumnsCommand}"
+                                Content="Выбрать все" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="1"
+                            Margin="10,0"
+                            VerticalAlignment="Center">
+                            <Button
+                                Margin="0,5"
+                                Command="{Binding AddColumnToReportCommand}"
+                                Content="→" />
+                            <Button
+                                Margin="0,5"
+                                Command="{Binding RemoveColumnFromReportCommand}"
+                                Content="←" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock
+                                Margin="0,0,0,5"
+                                FontSize="11"
+                                Text="Выбранные поля:" />
+                            <ListBox
+                                Height="150"
+                                ItemsSource="{Binding SelectedColumns}"
+                                SelectedItem="{Binding SelectedSelectedColumn}" />
+                            <Button
+                                Margin="0,5,0,0"
+                                Command="{Binding ClearColumnsCommand}"
+                                Content="Очистить" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Button
+                        Padding="15,8"
+                        HorizontalAlignment="Left"
+                        Command="{Binding GeneratePersonnelReportCommand}"
+                        IsEnabled="{Binding !IsLoading}">
+                        Сформировать отчёт по персоналу
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!--  Результат - для аналитика/администратора  -->
             <Border Classes="card" IsVisible="{Binding HasResult}">
                 <StackPanel>
                     <TextBlock

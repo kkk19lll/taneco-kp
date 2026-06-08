@@ -35,10 +35,25 @@ public class ReportsViewModel : ViewModelBase
     private Window? _parentWindow;
     private Window? _tempWindow;
 
+    // Для отчета по персоналу
+    private ObservableCollection<EmployeeForReport> _allEmployees;
+    private ObservableCollection<EmployeeForReport> _selectedEmployees;
+    private ObservableCollection<string> _availableColumns;
+    private ObservableCollection<string> _selectedColumns;
+    private DateTime _personnelStartDate = DateTime.Today.AddYears(-5);
+    private DateTime _personnelEndDate = DateTime.Today;
+    private string _personnelStartDateString = string.Empty;
+    private string _personnelEndDateString = string.Empty;
+
     public ReportsViewModel()
     {
         _db = new DatabaseService();
         _sensors = new ObservableCollection<SensorForDropdown>();
+        _allEmployees = new ObservableCollection<EmployeeForReport>();
+        _selectedEmployees = new ObservableCollection<EmployeeForReport>();
+        _availableColumns = new ObservableCollection<string>();
+        _selectedColumns = new ObservableCollection<string>();
+
         QuestPDF.Settings.License = LicenseType.Community;
 
         GenerateEquipmentReportCommand = new RelayCommand(async () => await GenerateEquipmentReportAsync(), () => !IsLoading && SelectedSensor != null);
@@ -47,14 +62,53 @@ public class ReportsViewModel : ViewModelBase
         GenerateComprehensiveEquipmentReportCommand = new RelayCommand(async () => await GenerateComprehensiveEquipmentReportAsync(), () => !IsLoading);
         GenerateComprehensiveProblemsReportCommand = new RelayCommand(async () => await GenerateComprehensiveProblemsReportAsync(), () => !IsLoading);
 
+        // Команды для отчета по персоналу
+        GeneratePersonnelReportCommand = new RelayCommand(async () => await GeneratePersonnelReportAsync(), () => !IsLoading && SelectedEmployees.Count > 0 && SelectedColumns.Count > 0);
+        AddEmployeeToReportCommand = new RelayCommand(AddEmployeeToReport, () => SelectedEmployeeFromList != null && !_selectedEmployees.Contains(SelectedEmployeeFromList));
+        RemoveEmployeeFromReportCommand = new RelayCommand(RemoveEmployeeFromReport, () => SelectedEmployeeFromSelected != null);
+        AddColumnToReportCommand = new RelayCommand(AddColumnToReport, () => SelectedAvailableColumn != null && !_selectedColumns.Contains(SelectedAvailableColumn));
+        RemoveColumnFromReportCommand = new RelayCommand(RemoveColumnFromReport, () => SelectedSelectedColumn != null);
+        SelectAllEmployeesCommand = new RelayCommand(SelectAllEmployees);
+        ClearEmployeesCommand = new RelayCommand(ClearEmployees);
+        SelectAllColumnsCommand = new RelayCommand(SelectAllColumns);
+        ClearColumnsCommand = new RelayCommand(ClearColumns);
+
         UpdateDateStrings();
+        UpdatePersonnelDateStrings();
         Task.Run(async () => await LoadSensors());
+        Task.Run(async () => await LoadEmployees());
+        InitializeColumns();
+    }
+
+    private void InitializeColumns()
+    {
+        _availableColumns.Add("ФИО");
+        _availableColumns.Add("Должность");
+        _availableColumns.Add("Отдел");
+        _availableColumns.Add("Стаж");
+        _availableColumns.Add("Дата приема");
+        _availableColumns.Add("Контактная информация");
+        _availableColumns.Add("Роль в системе");
+
+        // По умолчанию выбраны основные колонки
+        _selectedColumns.Add("ФИО");
+        _selectedColumns.Add("Должность");
+        _selectedColumns.Add("Стаж");
     }
 
     public void SetParentWindow(Window window)
     {
         _parentWindow = window;
     }
+
+    // Свойство для проверки прав на просмотр отчетов (Администратор или Аналитик)
+    public bool CanViewReports => CurrentUser != null && (CurrentUser.Role == "Администратор" || CurrentUser.Role == "Аналитик");
+
+    // Свойство для проверки прав на просмотр отчета по персоналу (только Аналитик)
+    public bool CanViewPersonnelReports => CurrentUser != null && CurrentUser.Role == "Аналитик";
+
+    // Свойство для проверки прав на экспорт (Администратор или Аналитик)
+    public bool CanExport => CurrentUser != null && (CurrentUser.Role == "Администратор" || CurrentUser.Role == "Аналитик");
 
     public User? CurrentUser
     {
@@ -63,7 +117,14 @@ public class ReportsViewModel : ViewModelBase
         {
             SetProperty(ref _currentUser, value);
             OnPropertyChanged(nameof(CanExport));
+            OnPropertyChanged(nameof(CanViewReports));
+            OnPropertyChanged(nameof(CanViewPersonnelReports));
             (ExportReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (GenerateEquipmentReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (GenerateStatisticsCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (GenerateComprehensiveEquipmentReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (GenerateComprehensiveProblemsReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
     }
 
@@ -72,8 +133,6 @@ public class ReportsViewModel : ViewModelBase
         get => _isLoading;
         set => SetProperty(ref _isLoading, value);
     }
-
-    public bool CanExport => CurrentUser != null && (CurrentUser.Role == "Администратор" || CurrentUser.Role == "Аналитик");
 
     public string ReportResult
     {
@@ -85,7 +144,8 @@ public class ReportsViewModel : ViewModelBase
                        value != "Генерация отчёта..." &&
                        value != "Расчёт статистики..." &&
                        value != "Генерация сводного отчёта по оборудованию..." &&
-                       value != "Генерация сводного отчёта по проблемам...";
+                       value != "Генерация сводного отчёта по проблемам..." &&
+                       value != "Генерация отчета по персоналу...";
             (ExportReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
     }
@@ -142,6 +202,121 @@ public class ReportsViewModel : ViewModelBase
         }
     }
 
+    // Свойства для отчета по персоналу
+    public DateTime PersonnelStartDate
+    {
+        get => _personnelStartDate;
+        set
+        {
+            SetProperty(ref _personnelStartDate, value);
+            UpdatePersonnelDateStrings();
+        }
+    }
+
+    public DateTime PersonnelEndDate
+    {
+        get => _personnelEndDate;
+        set
+        {
+            SetProperty(ref _personnelEndDate, value);
+            UpdatePersonnelDateStrings();
+        }
+    }
+
+    public string PersonnelStartDateString
+    {
+        get => _personnelStartDateString;
+        set
+        {
+            SetProperty(ref _personnelStartDateString, value);
+            if (DateTime.TryParseExact(value, "dd.MM.yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+            {
+                _personnelStartDate = parsedDate;
+            }
+        }
+    }
+
+    public string PersonnelEndDateString
+    {
+        get => _personnelEndDateString;
+        set
+        {
+            SetProperty(ref _personnelEndDateString, value);
+            if (DateTime.TryParseExact(value, "dd.MM.yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+            {
+                _personnelEndDate = parsedDate;
+            }
+        }
+    }
+
+    public ObservableCollection<EmployeeForReport> AllEmployees
+    {
+        get => _allEmployees;
+        set => SetProperty(ref _allEmployees, value);
+    }
+
+    public ObservableCollection<EmployeeForReport> SelectedEmployees
+    {
+        get => _selectedEmployees;
+        set => SetProperty(ref _selectedEmployees, value);
+    }
+
+    public ObservableCollection<string> AvailableColumns
+    {
+        get => _availableColumns;
+        set => SetProperty(ref _availableColumns, value);
+    }
+
+    public ObservableCollection<string> SelectedColumns
+    {
+        get => _selectedColumns;
+        set => SetProperty(ref _selectedColumns, value);
+    }
+
+    private EmployeeForReport? _selectedEmployeeFromList;
+    public EmployeeForReport? SelectedEmployeeFromList
+    {
+        get => _selectedEmployeeFromList;
+        set
+        {
+            SetProperty(ref _selectedEmployeeFromList, value);
+            (AddEmployeeToReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private EmployeeForReport? _selectedEmployeeFromSelected;
+    public EmployeeForReport? SelectedEmployeeFromSelected
+    {
+        get => _selectedEmployeeFromSelected;
+        set
+        {
+            SetProperty(ref _selectedEmployeeFromSelected, value);
+            (RemoveEmployeeFromReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private string? _selectedAvailableColumn;
+    public string? SelectedAvailableColumn
+    {
+        get => _selectedAvailableColumn;
+        set
+        {
+            SetProperty(ref _selectedAvailableColumn, value);
+            (AddColumnToReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private string? _selectedSelectedColumn;
+    public string? SelectedSelectedColumn
+    {
+        get => _selectedSelectedColumn;
+        set
+        {
+            SetProperty(ref _selectedSelectedColumn, value);
+            (RemoveColumnFromReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
     public ObservableCollection<SensorForDropdown> Sensors
     {
         get => _sensors;
@@ -164,6 +339,15 @@ public class ReportsViewModel : ViewModelBase
     public ICommand ExportReportCommand { get; }
     public ICommand GenerateComprehensiveEquipmentReportCommand { get; }
     public ICommand GenerateComprehensiveProblemsReportCommand { get; }
+    public ICommand GeneratePersonnelReportCommand { get; }
+    public ICommand AddEmployeeToReportCommand { get; }
+    public ICommand RemoveEmployeeFromReportCommand { get; }
+    public ICommand AddColumnToReportCommand { get; }
+    public ICommand RemoveColumnFromReportCommand { get; }
+    public ICommand SelectAllEmployeesCommand { get; }
+    public ICommand ClearEmployeesCommand { get; }
+    public ICommand SelectAllColumnsCommand { get; }
+    public ICommand ClearColumnsCommand { get; }
 
     private void UpdateDateStrings()
     {
@@ -173,12 +357,131 @@ public class ReportsViewModel : ViewModelBase
         OnPropertyChanged(nameof(EndDateString));
     }
 
+    private void UpdatePersonnelDateStrings()
+    {
+        _personnelStartDateString = _personnelStartDate.ToString("dd.MM.yyyy");
+        _personnelEndDateString = _personnelEndDate.ToString("dd.MM.yyyy");
+        OnPropertyChanged(nameof(PersonnelStartDateString));
+        OnPropertyChanged(nameof(PersonnelEndDateString));
+    }
+
     private async Task LoadSensors()
     {
         var sensors = await _db.GetSensorsForDropdownAsync();
         Sensors.Clear();
         foreach (var s in sensors)
             Sensors.Add(s);
+    }
+
+    private async Task LoadEmployees()
+    {
+        var employees = await _db.GetEmployeesAsync();
+        AllEmployees.Clear();
+        foreach (var emp in employees.Where(e => e.IsActive))
+        {
+            AllEmployees.Add(new EmployeeForReport
+            {
+                Id = emp.Id,
+                FullName = emp.FullName,
+                Position = emp.Position,
+                Department = emp.Department,
+                HireDate = emp.HireDate,
+                Phone = emp.Phone,
+                Role = emp.Role,
+                Experience = CalculateExperience(emp.HireDate)
+            });
+        }
+    }
+
+    private string CalculateExperience(DateTime hireDate)
+    {
+        var today = DateTime.Today;
+        int years = today.Year - hireDate.Year;
+        if (hireDate.Date > today.AddYears(-years)) years--;
+
+        int months = today.Month - hireDate.Month;
+        if (months < 0)
+        {
+            months += 12;
+            years--;
+        }
+
+        if (years > 0)
+            return $"{years} г. {months} мес.";
+        else
+            return $"{months} мес.";
+    }
+
+    private void AddEmployeeToReport()
+    {
+        if (SelectedEmployeeFromList != null && !_selectedEmployees.Contains(SelectedEmployeeFromList))
+        {
+            _selectedEmployees.Add(SelectedEmployeeFromList);
+            OnPropertyChanged(nameof(SelectedEmployees));
+            (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RemoveEmployeeFromReport()
+    {
+        if (SelectedEmployeeFromSelected != null)
+        {
+            _selectedEmployees.Remove(SelectedEmployeeFromSelected);
+            OnPropertyChanged(nameof(SelectedEmployees));
+            (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void AddColumnToReport()
+    {
+        if (SelectedAvailableColumn != null && !_selectedColumns.Contains(SelectedAvailableColumn))
+        {
+            _selectedColumns.Add(SelectedAvailableColumn);
+            OnPropertyChanged(nameof(SelectedColumns));
+            (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RemoveColumnFromReport()
+    {
+        if (SelectedSelectedColumn != null)
+        {
+            _selectedColumns.Remove(SelectedSelectedColumn);
+            OnPropertyChanged(nameof(SelectedColumns));
+            (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void SelectAllEmployees()
+    {
+        _selectedEmployees.Clear();
+        foreach (var emp in _allEmployees)
+            _selectedEmployees.Add(emp);
+        OnPropertyChanged(nameof(SelectedEmployees));
+        (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
+
+    private void ClearEmployees()
+    {
+        _selectedEmployees.Clear();
+        OnPropertyChanged(nameof(SelectedEmployees));
+        (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
+
+    private void SelectAllColumns()
+    {
+        _selectedColumns.Clear();
+        foreach (var col in _availableColumns)
+            _selectedColumns.Add(col);
+        OnPropertyChanged(nameof(SelectedColumns));
+        (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
+    }
+
+    private void ClearColumns()
+    {
+        _selectedColumns.Clear();
+        OnPropertyChanged(nameof(SelectedColumns));
+        (GeneratePersonnelReportCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task GenerateEquipmentReportAsync()
@@ -380,6 +683,81 @@ public class ReportsViewModel : ViewModelBase
                 result += $"  За указанный период проблем не зарегистрировано\n";
             }
             result += $"\nОтчёт сформирован: {DateTime.Now:dd.MM.yyyy HH:mm:ss}";
+
+            _currentReportText = result;
+            ReportResult = result;
+        }
+        catch (Exception ex)
+        {
+            ReportResult = $"Ошибка: {ex.Message}";
+            _currentReportText = "";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task GeneratePersonnelReportAsync()
+    {
+        if (_selectedEmployees.Count == 0)
+        {
+            await ShowWarning("Внимание", "Выберите хотя бы одного сотрудника для отчета");
+            return;
+        }
+
+        if (_selectedColumns.Count == 0)
+        {
+            await ShowWarning("Внимание", "Выберите хотя бы одну колонку для отображения");
+            return;
+        }
+
+        IsLoading = true;
+        ReportResult = "Генерация отчета по персоналу...";
+        _currentReportTitle = $"Отчет_по_персоналу_{PersonnelStartDate:dd.MM.yyyy}_{PersonnelEndDate:dd.MM.yyyy}";
+
+        try
+        {
+            var result = $"Период: {PersonnelStartDate:dd.MM.yyyy} - {PersonnelEndDate:dd.MM.yyyy}\n\n";
+
+            result += $"Выбрано сотрудников: {_selectedEmployees.Count}\n";
+            
+
+            // Формирование данных по сотрудникам
+            foreach (var emp in _selectedEmployees)
+            {
+                result += $"Сотрудник:\n";
+                foreach (var col in _selectedColumns)
+                {
+                    switch (col)
+                    {
+                        case "ФИО":
+                            result += $"  ФИО: {emp.FullName}\n";
+                            break;
+                        case "Должность":
+                            result += $"  Должность: {emp.Position}\n";
+                            break;
+                        case "Отдел":
+                            result += $"  Отдел: {emp.Department}\n";
+                            break;
+                        case "Стаж":
+                            result += $"  Стаж: {emp.Experience}\n";
+                            break;
+                        case "Дата приема":
+                            result += $"  Дата приема: {emp.HireDate:dd.MM.yyyy}\n";
+                            break;
+                        case "Контактная информация":
+                            result += $"  Контактная информация: {emp.Phone}\n";
+                            break;
+                        case "Роль в системе":
+                            result += $"  Роль в системе: {emp.Role}\n";
+                            break;
+                    }
+                }
+                result += "\n";
+            }
+
+            result += $"Отчёт сформирован: {DateTime.Now:dd.MM.yyyy HH:mm:ss}";
 
             _currentReportText = result;
             ReportResult = result;
@@ -607,4 +985,17 @@ public class ReportsViewModel : ViewModelBase
             await box.ShowAsync();
         });
     }
+}
+
+// Вспомогательный класс для отчета по персоналу
+public class EmployeeForReport
+{
+    public int Id { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string Position { get; set; } = string.Empty;
+    public string Department { get; set; } = string.Empty;
+    public string Experience { get; set; } = string.Empty;
+    public DateTime HireDate { get; set; }
+    public string Phone { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
 }

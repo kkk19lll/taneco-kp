@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Taneco")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+701be0d29e2612e955b33afd28fd1ecdb25fa548")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+aaf526de802ef39002a7537cb5e6322ee0df8de8")]
 [assembly: System.Reflection.AssemblyProductAttribute("Taneco")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Taneco")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
