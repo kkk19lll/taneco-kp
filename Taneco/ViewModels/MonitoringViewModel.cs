@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -18,8 +19,10 @@ public class MonitoringViewModel : ViewModelBase
     private bool _isLoading;
     private string _statusMessage;
     private User? _currentUser;
-    private ObservableCollection<DateTime> _availableDates;
     private DateTime _selectedDate;
+    private string _selectedDateString;
+    private ObservableCollection<DateTime> _availableDates;
+    private bool _isInitialized;
 
     public MonitoringViewModel()
     {
@@ -28,13 +31,41 @@ public class MonitoringViewModel : ViewModelBase
         _activeProblems = new ObservableCollection<Problem>();
         _availableDates = new ObservableCollection<DateTime>();
         _statusMessage = "Готов к работе";
+
         _selectedDate = DateTime.Today;
+        _selectedDateString = DateTime.Today.ToString("dd.MM.yyyy");
 
-        RefreshCommand = new RelayCommand(() => Task.Run(async () => await LoadDataAsync()), () => !IsLoading);
-        MeasurementClickCommand = new RelayCommand(OnMeasurementClick);
-        ProblemClickCommand = new RelayCommand(OnProblemClick);
+        RefreshCommand = new RelayCommand(async () => await RefreshDataAsync());
+        MeasurementClickCommand = new RelayCommand<Measurement>(OnMeasurementClick);
+        ProblemClickCommand = new RelayCommand<Problem>(OnProblemClick);
+    }
 
-        Task.Run(async () => await LoadDataAsync());
+    // Метод для инициализации после загрузки View
+    public async Task InitializeAsync()
+    {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
+        try
+        {
+            _availableDates = await _db.GetAvailableDatesAsync();
+
+            if (_availableDates.Count > 0)
+            {
+                var lastDate = _availableDates.First();
+                _selectedDate = lastDate;
+                _selectedDateString = lastDate.ToString("dd.MM.yyyy");
+                await LoadDataForDate(_selectedDate);
+            }
+            else
+            {
+                StatusMessage = "Нет данных в базе";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка инициализации: {ex.Message}";
+        }
     }
 
     public User? CurrentUser
@@ -47,24 +78,6 @@ public class MonitoringViewModel : ViewModelBase
     {
         get => _measurements;
         set => SetProperty(ref _measurements, value);
-    }
-
-    public ObservableCollection<DateTime> AvailableDates
-    {
-        get => _availableDates;
-        set => SetProperty(ref _availableDates, value);
-    }
-
-    public DateTime SelectedDate
-    {
-        get => _selectedDate;
-        set
-        {
-            if (SetProperty(ref _selectedDate, value))
-            {
-                Task.Run(async () => await SelectDate(value));
-            }
-        }
     }
 
     public ObservableCollection<Problem> ActiveProblems
@@ -86,131 +99,133 @@ public class MonitoringViewModel : ViewModelBase
     }
 
     public bool CanSelectDate => CurrentUser?.CanSelectDate ?? false;
-    public bool CanClick => CurrentUser?.Role == "Оператор";
+    public bool CanClick => CurrentUser?.Role == "Оператор" || CurrentUser?.Role == "Администратор";
+
+    public string SelectedDateString
+    {
+        get => _selectedDateString;
+        set
+        {
+            if (SetProperty(ref _selectedDateString, value))
+            {
+                if (DateTime.TryParseExact(value, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    _selectedDate = parsedDate;
+                }
+            }
+        }
+    }
 
     public ICommand RefreshCommand { get; }
     public ICommand MeasurementClickCommand { get; }
     public ICommand ProblemClickCommand { get; }
 
-    public async Task SelectDate(DateTime date)
+    private async Task RefreshDataAsync()
     {
-        SelectedDate = date;
-        await LoadMeasurementsForDate(date);
-        await LoadActiveProblemsForDateAsync(date);
+        if (DateTime.TryParseExact(SelectedDateString, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+        {
+            _selectedDate = parsedDate;
+            await LoadDataForDate(_selectedDate);
+        }
+        else
+        {
+            StatusMessage = "Ошибка: неверный формат даты. Используйте ДД.ММ.ГГГГ";
+        }
     }
 
-    public async Task LoadActiveProblemsForDateAsync(DateTime date)
+    private async Task LoadDataForDate(DateTime date)
     {
-        if (IsLoading) return;
         IsLoading = true;
-        try
-        {
-            var allProblems = await _db.GetActiveProblemsAsync();
-            var filteredProblems = allProblems.Where(p => p.NotificationDate.Date == date.Date).ToList();
+        StatusMessage = $"Загрузка данных за {date:dd.MM.yyyy}...";
 
-            ActiveProblems.Clear();
-            foreach (var p in filteredProblems)
-                ActiveProblems.Add(p);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Ошибка загрузки проблем: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private async Task LoadDataAsync()
-    {
-        if (IsLoading) return;
-
-        IsLoading = true;
-        StatusMessage = "Загрузка данных...";
-
-        try
-        {
-            var allMeasurements = await _db.GetAllMeasurementsAsync();
-            var uniqueDates = allMeasurements
-                .Select(m => m.Date.Date)
-                .Distinct()
-                .OrderByDescending(d => d)
-                .ToList();
-
-            AvailableDates.Clear();
-            foreach (var date in uniqueDates)
-                AvailableDates.Add(date);
-
-            if (AvailableDates.Any())
-            {
-                SelectedDate = AvailableDates.First();
-                await LoadMeasurementsForDate(SelectedDate);
-                await LoadActiveProblemsForDateAsync(SelectedDate);
-            }
-            else
-            {
-                var allProblems = await _db.GetActiveProblemsAsync();
-                ActiveProblems.Clear();
-                foreach (var p in allProblems)
-                    ActiveProblems.Add(p);
-            }
-
-            StatusMessage = $"Данные загружено: {Measurements.Count} показаний, {ActiveProblems.Count} проблем";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Ошибка: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private async Task LoadMeasurementsForDate(DateTime date)
-    {
         try
         {
             var measurementsForDate = await _db.GetMeasurementsByDateAsync(date);
             Measurements.Clear();
             foreach (var m in measurementsForDate)
                 Measurements.Add(m);
+
+            var problemsForDate = await _db.GetActiveProblemsByDateAsync(date);
+            ActiveProblems.Clear();
+            foreach (var p in problemsForDate)
+                ActiveProblems.Add(p);
+
+            if (Measurements.Count == 0 && ActiveProblems.Count == 0)
+            {
+                if (_availableDates.Count > 0)
+                {
+                    StatusMessage = $"За {date:dd.MM.yyyy} данных нет. Доступные даты: {string.Join(", ", _availableDates.Take(5).Select(d => d.ToString("dd.MM.yyyy")))}";
+                }
+                else
+                {
+                    StatusMessage = $"За {date:dd.MM.yyyy} данных нет";
+                }
+            }
+            else
+            {
+                StatusMessage = $"Данные за {date:dd.MM.yyyy}: {Measurements.Count} показаний, {ActiveProblems.Count} проблем";
+            }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Ошибка загрузки показаний: {ex.Message}";
+            StatusMessage = $"Ошибка загрузки: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
-    private void OnMeasurementClick(object parameter)
+    private async void OnMeasurementClick(Measurement? measurement)
     {
-        if (parameter is Measurement measurement && CanClick)
+        if (measurement == null) return;
+
+        try
         {
             var dialog = new MeasurementDetailsWindow();
             var viewModel = new MeasurementDetailsViewModel(measurement, _db);
             dialog.DataContext = viewModel;
 
-            if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            var desktop = App.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            if (desktop?.MainWindow != null)
             {
-                dialog.ShowDialog(desktop.MainWindow);
+                await dialog.ShowDialog(desktop.MainWindow);
             }
+            else
+            {
+                dialog.Show();
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка открытия окна: {ex.Message}";
         }
     }
 
-    private void OnProblemClick(object parameter)
+    private async void OnProblemClick(Problem? problem)
     {
-        if (parameter is Problem problem && CanClick)
+        if (problem == null) return;
+
+        try
         {
             var dialog = new ProblemDetailsWindow();
             var viewModel = new ProblemDetailsViewModel(problem, _db, CurrentUser);
             dialog.DataContext = viewModel;
 
-            if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            var desktop = App.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            if (desktop?.MainWindow != null)
             {
-                dialog.ShowDialog(desktop.MainWindow);
-                Task.Run(async () => await LoadActiveProblemsForDateAsync(SelectedDate));
+                await dialog.ShowDialog(desktop.MainWindow);
+                await LoadDataForDate(_selectedDate);
             }
+            else
+            {
+                dialog.Show();
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка открытия окна: {ex.Message}";
         }
     }
 

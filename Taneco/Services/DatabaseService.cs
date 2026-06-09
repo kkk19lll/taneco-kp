@@ -343,6 +343,79 @@ public class DatabaseService
         return problems;
     }
 
+    // Новый метод для получения активных проблем за конкретную дату
+    public async Task<ObservableCollection<Problem>> GetActiveProblemsByDateAsync(DateTime date)
+    {
+        var problems = new ObservableCollection<Problem>();
+        const string query = @"
+        SELECT DISTINCT
+            up.Код_уведом_проб,
+            COALESCE(tp.Наименование, 'Неизвестный тип') as Тип_проблемы,
+            COALESCE(up.Описание, 'Нет описания') as Описание,
+            up.Дата_уведомления,
+            COALESCE(up.Время_уведомления, '00:00:00'::time) as Время_уведомления,
+            COALESCE(t.Код_трубопровода, 0) as Код_трубопровода,
+            COALESCE(t.Наименование, 'Неизвестный трубопровод') as Трубопровод,
+            COALESCE(z.Текущее_значение, 0) as Текущее_значение,
+            COALESCE(rd.Максимальное_значение, 0) as Максимальное_значение,
+            COALESCE(tp.Категория_риска, 'Средний') as Категория_риска,
+            CASE
+                WHEN p.Код_проверки IS NULL THEN 'Новая'
+                WHEN st.Код_статуса_проверки = 6 THEN 'Завершена'
+                WHEN st.Код_статуса_проверки = 7 THEN 'Отложена'
+                WHEN st.Код_статуса_проверки = 8 THEN 'Отменена'
+                WHEN st.Код_статуса_проверки = 4 THEN 'Ожидает подтверждения'
+                WHEN st.Код_статуса_проверки = 2 THEN 'В процессе выполнения'
+                ELSE COALESCE(st.Наименование, 'В работе')
+            END as Статус,
+            up.Дата_уведомления as SortDate,
+            up.Время_уведомления as SortTime
+        FROM Уведомление_проблемы up
+        LEFT JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+        LEFT JOIN Замер z ON up.Код_замера = z.Код_замера
+        LEFT JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+        LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+        LEFT JOIN Датчик d ON dt.Код_датчика = d.Код_датчика
+        LEFT JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+        LEFT JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+        LEFT JOIN Проверка p ON up.Код_уведом_проб = p.Код_уведом_проб
+        LEFT JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
+        WHERE up.Дата_уведомления = @date
+        AND (p.Код_проверки IS NULL OR st.Код_статуса_проверки NOT IN (6, 7, 8))
+        ORDER BY SortDate DESC, SortTime DESC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@date", date);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var problem = new Problem
+                {
+                    Id = reader.GetInt32(0),
+                    Type = reader.GetString(1),
+                    Description = reader.GetString(2),
+                    NotificationDate = reader.GetDateTime(3),
+                    NotificationTime = reader.GetTimeSpan(4),
+                    PipelineId = reader.GetInt32(5),
+                    PipelineName = reader.GetString(6),
+                    MeasuredValue = reader.GetDecimal(7),
+                    ThresholdValue = reader.GetDecimal(8),
+                    RiskCategory = reader.GetString(9),
+                    Status = reader.GetString(10)
+                };
+                problems.Add(problem);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetActiveProblemsByDateAsync error: {ex.Message}");
+        }
+        return problems;
+    }
+
     public async Task<ObservableCollection<ProblemHistoryEvent>> GetProblemHistoryAsync(int problemId)
     {
         var history = new ObservableCollection<ProblemHistoryEvent>();
@@ -1732,8 +1805,9 @@ public class DatabaseService
                 dates.Add(reader.GetDateTime(0));
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"GetAvailableDatesAsync error: {ex.Message}");
         }
         return dates;
     }

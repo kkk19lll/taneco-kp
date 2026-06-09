@@ -9,13 +9,16 @@ public partial class MonitoringView : UserControl
     public MonitoringView()
     {
         InitializeComponent();
+
+        // Подписываемся на событие загрузки
+        this.Loaded += OnLoaded;
     }
 
-    private async void OnDateSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (DataContext is MonitoringViewModel vm && sender is ComboBox comboBox && comboBox.SelectedItem is DateTime selectedDate)
+        if (DataContext is MonitoringViewModel viewModel)
         {
-            await vm.SelectDate(selectedDate);
+            await viewModel.InitializeAsync();
         }
     }
 }

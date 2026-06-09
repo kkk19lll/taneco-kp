@@ -21,7 +21,7 @@ public class User
 
     public bool CanEditSensors => Role == "Инженер_КИПиА";
 
-    public bool CanManageEquipment => Role == "Администратор"; 
+    public bool CanManageEquipment => Role == "Администратор";
 
     public bool CanManageProblems => Role == "Администратор" || Role == "Оператор" || Role == "Инспектор";
 
