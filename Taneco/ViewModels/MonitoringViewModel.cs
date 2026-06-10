@@ -32,6 +32,7 @@ public class MonitoringViewModel : ViewModelBase
         _availableDates = new ObservableCollection<DateTime>();
         _statusMessage = "Готов к работе";
 
+        // Устанавливаем сегодняшнюю дату по умолчанию
         _selectedDate = DateTime.Today;
         _selectedDateString = DateTime.Today.ToString("dd.MM.yyyy");
 
@@ -48,19 +49,11 @@ public class MonitoringViewModel : ViewModelBase
 
         try
         {
+            // Получаем доступные даты из БД (для информации)
             _availableDates = await _db.GetAvailableDatesAsync();
 
-            if (_availableDates.Count > 0)
-            {
-                var lastDate = _availableDates.First();
-                _selectedDate = lastDate;
-                _selectedDateString = lastDate.ToString("dd.MM.yyyy");
-                await LoadDataForDate(_selectedDate);
-            }
-            else
-            {
-                StatusMessage = "Нет данных в базе";
-            }
+            // Загружаем данные за СЕГОДНЯШНЮЮ дату (не за последнюю доступную)
+            await LoadDataForDate(DateTime.Today);
         }
         catch (Exception ex)
         {
@@ -150,16 +143,10 @@ public class MonitoringViewModel : ViewModelBase
             foreach (var p in problemsForDate)
                 ActiveProblems.Add(p);
 
+            // Проверяем, есть ли данные
             if (Measurements.Count == 0 && ActiveProblems.Count == 0)
             {
-                if (_availableDates.Count > 0)
-                {
-                    StatusMessage = $"За {date:dd.MM.yyyy} данных нет. Доступные даты: {string.Join(", ", _availableDates.Take(5).Select(d => d.ToString("dd.MM.yyyy")))}";
-                }
-                else
-                {
-                    StatusMessage = $"За {date:dd.MM.yyyy} данных нет";
-                }
+                StatusMessage = $"За {date:dd.MM.yyyy} данные отсутствуют";
             }
             else
             {
@@ -169,6 +156,9 @@ public class MonitoringViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusMessage = $"Ошибка загрузки: {ex.Message}";
+            // Очищаем списки при ошибке
+            Measurements.Clear();
+            ActiveProblems.Clear();
         }
         finally
         {
@@ -216,6 +206,7 @@ public class MonitoringViewModel : ViewModelBase
             if (desktop?.MainWindow != null)
             {
                 await dialog.ShowDialog(desktop.MainWindow);
+                // После закрытия окна обновляем данные за текущую дату
                 await LoadDataForDate(_selectedDate);
             }
             else
