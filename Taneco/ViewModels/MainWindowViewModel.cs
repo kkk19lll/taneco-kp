@@ -8,7 +8,7 @@ namespace Taneco.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     private object? _currentView;
-    private string _currentTitle = "Мониторинг";
+    private string _currentTitle = string.Empty;
     private User? _currentUser;
 
     public MainWindowViewModel(User user)
@@ -25,8 +25,44 @@ public class MainWindowViewModel : ViewModelBase
         ShowEquipmentManagementCommand = new RelayCommand(_ => ShowEquipmentManagement());
         LogoutCommand = new RelayCommand(_ => Environment.Exit(0));
 
+        // Открываем окно по умолчанию в зависимости от роли
+        ShowDefaultViewForRole();
+    }
 
-        ShowMonitoring();
+    private void ShowDefaultViewForRole()
+    {
+        if (CurrentUser == null) return;
+
+        // Определяем основную роль пользователя и открываем соответствующее окно
+        switch (CurrentUser.Role)
+        {
+            case "Администратор":
+                // Для администратора открываем мониторинг (главная страница)
+                ShowMonitoring();
+                break;
+            case "Оператор":
+                ShowMonitoring();
+                break;
+            case "Инженер_КИПиА":
+                ShowEquipments();
+                break;
+            case "Инспектор":
+                ShowProblems();
+                break;
+            case "Начальник_ремонтной_службы":
+                ShowRepairs();
+                break;
+            case "HR":
+                ShowStaff();
+                break;
+            case "Аналитик":
+                ShowReports();
+                break;
+            default:
+                // Если роль не распознана, показываем мониторинг
+                ShowMonitoring();
+                break;
+        }
     }
 
     public User? CurrentUser
@@ -64,7 +100,6 @@ public class MainWindowViewModel : ViewModelBase
     public ICommand ShowRepairsCommand { get; }
     public ICommand ShowStaffCommand { get; }
     public ICommand ShowReportsCommand { get; }
-    public ICommand ShowAdminCommand { get; }
     public ICommand LogoutCommand { get; }
     public ICommand ShowEquipmentManagementCommand { get; }
 
@@ -145,6 +180,6 @@ public class MainWindowViewModel : ViewModelBase
         viewModel.CurrentUser = CurrentUser;
         view.DataContext = viewModel;
         CurrentView = view;
-        CurrentTitle = "Оборудование";
+        CurrentTitle = "Управление оборудованием";
     }
 }
