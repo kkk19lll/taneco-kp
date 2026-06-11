@@ -9,6 +9,7 @@ using Taneco.Services;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
 using Avalonia.Threading;
+using System.Collections.Generic;
 
 namespace Taneco.ViewModels;
 
@@ -37,6 +38,9 @@ public class StaffViewModel : ViewModelBase
     private string _editLogin = string.Empty;
     private string _editPassword = string.Empty;
     private string _editHireDateRaw = string.Empty;
+
+    // Хранилище всех должностей для каждой роли
+    private Dictionary<string, List<string>> _positionsByRole = new();
 
     private bool _isUpdatingPhone;
     private bool _isUpdatingHireDate;
@@ -72,6 +76,7 @@ public class StaffViewModel : ViewModelBase
         AvailableRoles.Add("Аналитик");
 
         Task.Run(async () => await LoadDepartmentsAsync());
+        Task.Run(async () => await LoadPositionsByRoleAsync());
         Task.Run(async () => await LoadActiveEmployeesAsync());
         Task.Run(async () => await LoadArchivedEmployeesAsync());
     }
@@ -126,8 +131,10 @@ public class StaffViewModel : ViewModelBase
                     EditPatronymic = value.Patronymic;
                     EditPhoneRaw = CleanPhoneNumber(value.Phone);
                     EditDepartment = value.Department;
-                    EditPosition = value.Position;
                     EditRole = value.Role;
+                    // Загружаем должности для выбранной роли
+                    UpdatePositionsForRole(value.Role);
+                    EditPosition = value.Position;
                     EditLogin = value.Login;
                     EditPassword = "";
                     EditHireDateRaw = value.HireDate.ToString("yyyy-MM-dd").Replace("-", "");
@@ -200,6 +207,40 @@ public class StaffViewModel : ViewModelBase
     public string EditLastName { get => _editLastName; set => SetProperty(ref _editLastName, value); }
     public string EditFirstName { get => _editFirstName; set => SetProperty(ref _editFirstName, value); }
     public string EditPatronymic { get => _editPatronymic; set => SetProperty(ref _editPatronymic, value); }
+
+    public string EditRole
+    {
+        get => _editRole;
+        set
+        {
+            if (SetProperty(ref _editRole, value))
+            {
+                // При смене роли обновляем список должностей
+                UpdatePositionsForRole(value);
+                // Сбрасываем выбранную должность на первую доступную или на пустую
+                if (Positions.Any())
+                    EditPosition = Positions.FirstOrDefault() ?? "";
+                else
+                    EditPosition = "";
+            }
+        }
+    }
+
+    private void UpdatePositionsForRole(string role)
+    {
+        Positions.Clear();
+        if (_positionsByRole.ContainsKey(role))
+        {
+            foreach (var pos in _positionsByRole[role])
+                Positions.Add(pos);
+        }
+    }
+
+    public string EditPosition
+    {
+        get => _editPosition;
+        set => SetProperty(ref _editPosition, value);
+    }
 
     public string EditHireDateDisplay
     {
@@ -348,8 +389,6 @@ public class StaffViewModel : ViewModelBase
     }
 
     public string EditDepartment { get => _editDepartment; set => SetProperty(ref _editDepartment, value); }
-    public string EditPosition { get => _editPosition; set => SetProperty(ref _editPosition, value); }
-    public string EditRole { get => _editRole; set => SetProperty(ref _editRole, value); }
     public string EditLogin { get => _editLogin; set => SetProperty(ref _editLogin, value); }
     public string EditPassword { get => _editPassword; set => SetProperty(ref _editPassword, value); }
 
@@ -418,6 +457,22 @@ public class StaffViewModel : ViewModelBase
         }
     }
 
+    private async Task LoadPositionsByRoleAsync()
+    {
+        try
+        {
+            foreach (var role in AvailableRoles)
+            {
+                var positions = await _db.GetPositionsByRoleAsync(role);
+                _positionsByRole[role] = positions.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LoadPositionsByRoleAsync error: {ex.Message}");
+        }
+    }
+
     private async Task LoadActiveEmployeesAsync()
     {
         if (IsLoading) return;
@@ -434,11 +489,6 @@ public class StaffViewModel : ViewModelBase
                 _allActiveEmployees.Clear();
                 foreach (var e in activeEmployees)
                     _allActiveEmployees.Add(e);
-
-                var pos = _allActiveEmployees.Select(e => e.Position).Distinct().ToList();
-                Positions.Clear();
-                foreach (var p in pos)
-                    Positions.Add(p);
 
                 FilterActiveEmployees();
             });
@@ -527,8 +577,10 @@ public class StaffViewModel : ViewModelBase
         EditPatronymic = "";
         EditPhoneRaw = "";
         EditDepartment = Departments.FirstOrDefault() ?? "";
-        EditPosition = Positions.FirstOrDefault() ?? "";
         EditRole = "Оператор";
+        // Загружаем должности для роли "Оператор"
+        UpdatePositionsForRole("Оператор");
+        EditPosition = Positions.FirstOrDefault() ?? "";
         EditLogin = "";
         EditPassword = "";
         EditHireDateRaw = DateTime.Today.ToString("yyyyMMdd");
@@ -553,8 +605,9 @@ public class StaffViewModel : ViewModelBase
             EditPatronymic = SelectedActiveEmployee.Patronymic;
             EditPhoneRaw = CleanPhoneNumber(SelectedActiveEmployee.Phone);
             EditDepartment = SelectedActiveEmployee.Department;
-            EditPosition = SelectedActiveEmployee.Position;
             EditRole = SelectedActiveEmployee.Role;
+            UpdatePositionsForRole(SelectedActiveEmployee.Role);
+            EditPosition = SelectedActiveEmployee.Position;
             EditLogin = SelectedActiveEmployee.Login;
             EditHireDateRaw = SelectedActiveEmployee.HireDate.ToString("yyyyMMdd");
         }
@@ -648,6 +701,12 @@ public class StaffViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(EditLogin))
         {
             await ShowMessageBox("Ошибка", "Логин обязателен");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditPosition))
+        {
+            await ShowMessageBox("Ошибка", "Должность обязательна");
             return;
         }
 
@@ -854,15 +913,14 @@ public class StaffViewModel : ViewModelBase
         const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const string lowercase = "abcdefghijklmnopqrstuvwxyz";
         const string digits = "0123456789";
-        const string special = "!@$%^?_";
 
         var password = new char[10];
         password[0] = uppercase[random.Next(uppercase.Length)];
         password[1] = lowercase[random.Next(lowercase.Length)];
         password[2] = digits[random.Next(digits.Length)];
-        password[3] = special[random.Next(special.Length)];
+        password[3] = uppercase[random.Next(uppercase.Length)];
 
-        const string allChars = uppercase + lowercase + digits + special;
+        const string allChars = uppercase + lowercase + digits;
         for (int i = 4; i < password.Length; i++)
         {
             password[i] = allChars[random.Next(allChars.Length)];
