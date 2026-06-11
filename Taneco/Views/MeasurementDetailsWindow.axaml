@@ -1,70 +1,361 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:Taneco.ViewModels"
-        x:Class="Taneco.Views.MeasurementDetailsWindow"
-        x:DataType="vm:MeasurementDetailsViewModel"
-        Title="История показаний датчика"
-        Width="600" Height="500"
-        WindowStartupLocation="CenterOwner"
-        CanResize="True">
+<Window
+    x:Class="Taneco.Views.MeasurementDetailsWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    Title="История показаний датчика"
+    Width="700"
+    Height="600"
+    x:DataType="vm:MeasurementDetailsViewModel"
+    CanResize="True"
+    TransparencyLevelHint="AcrylicBlur"
+    WindowStartupLocation="CenterOwner">
 
-    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
+    <Window.Styles>
+        <!--  Улучшенные карточки  -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource SecondaryBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Margin" Value="0,0,0,20" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect
+                        BlurRadius="12"
+                        OffsetX="0"
+                        OffsetY="4"
+                        Opacity="0.12" />
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- Информация о датчике -->
-        <Border Grid.Row="0" Classes="card" Margin="0,0,0,15">
-            <StackPanel>
-                <TextBlock Text="{Binding Measurement.SensorName}" FontWeight="Bold" FontSize="16"/>
-                <TextBlock Text="{Binding Measurement.PipelineName}" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                <Grid ColumnDefinitions="Auto,Auto" Margin="0,10,0,0">
-                    <TextBlock Text="Текущее значение:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                    <TextBlock Text="{Binding Measurement.Value}" FontSize="16" FontWeight="Bold" 
-                               Foreground="{StaticResource SuccessBrush}" Margin="10,0,0,0"/>
-                    <TextBlock Text="{Binding Measurement.Unit}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0"/>
-                </Grid>
-                <TextBlock Text="{Binding Measurement.Date, StringFormat='Дата замера: dd.MM.yyyy HH:mm:ss'}" FontSize="11" 
-                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
+        <!--  Основные кнопки  -->
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource AccentColor}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Padding" Value="20,10" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect
+                        BlurRadius="6"
+                        OffsetX="0"
+                        OffsetY="2"
+                        Opacity="0.2" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentColorDark}" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect
+                        BlurRadius="10"
+                        OffsetX="0"
+                        OffsetY="4"
+                        Opacity="0.3" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  Вторичные кнопки  -->
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}" />
+            <Setter Property="Padding" Value="30,10" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+        </Style>
+
+        <Style Selector="Button.secondary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentColor}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!--  Кнопки периода  -->
+        <Style Selector="Button.period">
+            <Setter Property="Background" Value="{DynamicResource TertiaryBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="Padding" Value="24,10" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style Selector="Button.period:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentColor}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!--  Элементы истории  -->
+        <Style Selector="Border.history-item">
+            <Setter Property="Background" Value="{DynamicResource TertiaryBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect
+                        BlurRadius="4"
+                        OffsetX="0"
+                        OffsetY="1"
+                        Opacity="0.05" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style Selector="Border.history-item:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect
+                        BlurRadius="8"
+                        OffsetX="0"
+                        OffsetY="2"
+                        Opacity="0.1" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  Текстовые стили  -->
+        <Style Selector="TextBlock.h3">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        </Style>
+
+        <!--  Индикатор значения  -->
+        <Style Selector="Border.value-indicator">
+            <Setter Property="Background" Value="{DynamicResource AccentColor}" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+
+        <!--  Полоса прокрутки  -->
+        <Style Selector="ScrollViewer">
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        </Style>
+
+        <Style Selector="ScrollBar">
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+    </Window.Styles>
+
+    <Grid Margin="24,20,24,20" RowDefinitions="Auto,Auto,*,Auto">
+
+        <!--  Шапка: информация о датчике  -->
+        <Border Grid.Row="0" Classes="card">
+            <StackPanel Spacing="12">
+                <!--  Название  -->
+                <StackPanel
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="12">
+                    <Border
+                        Width="40"
+                        Height="40"
+                        Background="{DynamicResource AccentColor}"
+                        CornerRadius="12">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="20"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="i" />
+                    </Border>
+                    <StackPanel>
+                        <TextBlock
+                            FontSize="18"
+                            FontWeight="Bold"
+                            Foreground="{DynamicResource TextPrimaryBrush}"
+                            Text="{Binding Measurement.SensorName}" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            Text="{Binding Measurement.PipelineName}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!--  Текущее значение  -->
+                <Border Classes="value-indicator">
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <TextBlock
+                            FontSize="13"
+                            Foreground="White"
+                            Opacity="0.9"
+                            Text="Текущее значение:" />
+                        <TextBlock
+                            FontSize="28"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="{Binding Measurement.Value}" />
+                        <TextBlock
+                            FontSize="13"
+                            Foreground="White"
+                            Opacity="0.8"
+                            Text="{Binding Measurement.Unit}" />
+                    </StackPanel>
+                </Border>
+
+                <!--  Дата замера  -->
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="11"
+                    Foreground="{DynamicResource TextSecondaryBrush}"
+                    Text="{Binding Measurement.Date, StringFormat='Последний замер: dd.MM.yyyy HH:mm:ss'}" />
             </StackPanel>
         </Border>
 
-        <!-- Выбор периода -->
-        <Border Grid.Row="1" Classes="card" Margin="0,0,0,15">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <Button Command="{Binding ShowWeekCommand}" 
-                        Background="{StaticResource InfoBrush}" Padding="15,8">Неделя</Button>
-                <Button Command="{Binding ShowMonthCommand}" 
-                        Background="{StaticResource InfoBrush}" Padding="15,8">Месяц</Button>
-                <Button Command="{Binding ShowYearCommand}" 
-                        Background="{StaticResource InfoBrush}" Padding="15,8">Год</Button>
+        <!--  Периоды  -->
+        <Border
+            Grid.Row="1"
+            Margin="0,0,0,20"
+            Padding="16,12"
+            Background="Transparent">
+            <StackPanel
+                HorizontalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="12">
+                <Button Classes="period" Command="{Binding ShowWeekCommand}">Неделя</Button>
+                <Button Classes="period" Command="{Binding ShowMonthCommand}">Месяц</Button>
+                <Button Classes="period" Command="{Binding ShowYearCommand}">Год</Button>
             </StackPanel>
         </Border>
 
-        <!-- График (заглушка, будет график) -->
+        <!--  График и история  -->
         <Border Grid.Row="2" Classes="card">
             <StackPanel>
-                <TextBlock Text="График изменения показаний" Classes="h3" Margin="0,0,0,10"/>
-                <ItemsControl ItemsSource="{Binding HistoryMeasurements}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border CornerRadius="5" Padding="8" Margin="0,0,0,3">
-                                <Grid ColumnDefinitions="*,Auto,Auto">
-                                    <TextBlock Grid.Column="0" Text="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" FontSize="11"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="Bold"
-                                               Foreground="{StaticResource SuccessBrush}" Margin="10,0,0,0"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding Unit}" FontSize="11" 
-                                               Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="{Binding HistoryMeasurements.Count, StringFormat='Всего записей: {0}'}" 
-                           FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+                <!--  Заголовок  -->
+                <StackPanel
+                    Margin="0,0,0,16"
+                    Orientation="Horizontal"
+                    Spacing="10">
+                    <Border
+                        Width="4"
+                        Background="{DynamicResource AccentColor}"
+                        CornerRadius="2" />
+                    <TextBlock Classes="h3" Text="График изменения показаний" />
+                    <Border
+                        Margin="10,0,0,0"
+                        Padding="6,2"
+                        Background="{DynamicResource AccentColor}"
+                        CornerRadius="6"
+                        Opacity="0.8">
+                        <TextBlock
+                            FontSize="10"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="{Binding HistoryMeasurements.Count}" />
+                    </Border>
+                </StackPanel>
+
+                <!--  Список истории  -->
+                <ScrollViewer MaxHeight="280" Margin="0,0,0,12">
+                    <ItemsControl ItemsSource="{Binding HistoryMeasurements}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Classes="history-item">
+                                    <Grid ColumnDefinitions="*,Auto,Auto">
+                                        <!--  Дата  -->
+                                        <StackPanel
+                                            Grid.Column="0"
+                                            Orientation="Horizontal"
+                                            Spacing="8">
+                                            <TextBlock
+                                                FontSize="13"
+                                                FontWeight="Medium"
+                                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                                Text="{Binding Date, StringFormat='dd.MM.yyyy'}" />
+                                            <TextBlock
+                                                FontSize="11"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                Text="{Binding Date, StringFormat='HH:mm:ss'}" />
+                                        </StackPanel>
+
+                                        <!--  Значение  -->
+                                        <StackPanel
+                                            Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            Spacing="4">
+                                            <TextBlock
+                                                FontSize="18"
+                                                FontWeight="Bold"
+                                                Foreground="{DynamicResource AccentColor}"
+                                                Text="{Binding Value}" />
+                                            <TextBlock
+                                                FontSize="12"
+                                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                                Text="{Binding Unit}" />
+                                        </StackPanel>
+
+                                        <!--  Индикатор тренда  -->
+                                        <Border
+                                            Grid.Column="2"
+                                            Width="3"
+                                            Height="30"
+                                            Margin="15,0,0,0">
+                                            <Border.Styles>
+                                                <Style Selector="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource AccentColor}" />
+                                                    <Setter Property="CornerRadius" Value="2" />
+                                                </Style>
+                                            </Border.Styles>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!--  Счетчик записей  -->
+                <Border
+                    Padding="12"
+                    Background="{DynamicResource TertiaryBackgroundBrush}"
+                    CornerRadius="10">
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="Medium"
+                        Foreground="{DynamicResource TextSecondaryBrush}"
+                        Text="{Binding HistoryMeasurements.Count, StringFormat='Всего записей в истории: {0}'}"
+                        TextAlignment="Center" />
+                </Border>
+
+                <!--  Индикатор загрузки  -->
+                <ProgressBar
+                    Height="3"
+                    Margin="0,12,0,0"
+                    CornerRadius="2"
+                    IsIndeterminate="{Binding IsLoading}"
+                    IsVisible="{Binding IsLoading}" />
             </StackPanel>
         </Border>
 
-        <!-- Кнопка закрытия -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
-            <Button Command="{Binding CloseCommand}" Background="{StaticResource TextMutedBrush}" Padding="20,8">Закрыть</Button>
+        <!--  Кнопка закрытия  -->
+        <StackPanel
+            Grid.Row="3"
+            Margin="0,20,0,0"
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Spacing="12">
+            <Button Classes="secondary" Command="{Binding CloseCommand}">Закрыть</Button>
         </StackPanel>
 
     </Grid>

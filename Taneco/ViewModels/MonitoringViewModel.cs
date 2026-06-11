@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls;
 using Taneco.Models;
 using Taneco.Services;
 using Taneco.Views;
@@ -32,7 +32,6 @@ public class MonitoringViewModel : ViewModelBase
         _availableDates = new ObservableCollection<DateTime>();
         _statusMessage = "Готов к работе";
 
-        // Устанавливаем сегодняшнюю дату по умолчанию
         _selectedDate = DateTime.Today;
         _selectedDateString = DateTime.Today.ToString("dd.MM.yyyy");
 
@@ -41,7 +40,6 @@ public class MonitoringViewModel : ViewModelBase
         ProblemClickCommand = new RelayCommand<Problem>(OnProblemClick);
     }
 
-    // Метод для инициализации после загрузки View
     public async Task InitializeAsync()
     {
         if (_isInitialized) return;
@@ -49,10 +47,7 @@ public class MonitoringViewModel : ViewModelBase
 
         try
         {
-            // Получаем доступные даты из БД (для информации)
             _availableDates = await _db.GetAvailableDatesAsync();
-
-            // Загружаем данные за СЕГОДНЯШНЮЮ дату (не за последнюю доступную)
             await LoadDataForDate(DateTime.Today);
         }
         catch (Exception ex)
@@ -92,7 +87,7 @@ public class MonitoringViewModel : ViewModelBase
     }
 
     public bool CanSelectDate => CurrentUser?.CanSelectDate ?? false;
-    public bool CanClick => CurrentUser?.Role == "Оператор" || CurrentUser?.Role == "Администратор";
+    public bool CanClick => CurrentUser?.Role == "Оператор";
 
     public string SelectedDateString
     {
@@ -143,7 +138,6 @@ public class MonitoringViewModel : ViewModelBase
             foreach (var p in problemsForDate)
                 ActiveProblems.Add(p);
 
-            // Проверяем, есть ли данные
             if (Measurements.Count == 0 && ActiveProblems.Count == 0)
             {
                 StatusMessage = $"За {date:dd.MM.yyyy} данные отсутствуют";
@@ -156,7 +150,6 @@ public class MonitoringViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusMessage = $"Ошибка загрузки: {ex.Message}";
-            // Очищаем списки при ошибке
             Measurements.Clear();
             ActiveProblems.Clear();
         }
@@ -173,18 +166,11 @@ public class MonitoringViewModel : ViewModelBase
         try
         {
             var dialog = new MeasurementDetailsWindow();
-            var viewModel = new MeasurementDetailsViewModel(measurement, _db);
+            var viewModel = new MeasurementDetailsViewModel(measurement, _db, () => dialog.Close());
             dialog.DataContext = viewModel;
 
-            var desktop = App.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
-            if (desktop?.MainWindow != null)
-            {
-                await dialog.ShowDialog(desktop.MainWindow);
-            }
-            else
-            {
-                dialog.Show();
-            }
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            dialog.Show();
         }
         catch (Exception ex)
         {
@@ -196,23 +182,30 @@ public class MonitoringViewModel : ViewModelBase
     {
         if (problem == null) return;
 
+        if (CurrentUser?.Role != "Оператор")
+        {
+            await ShowProblemInfoOnly(problem);
+            return;
+        }
+
         try
         {
             var dialog = new ProblemDetailsWindow();
-            var viewModel = new ProblemDetailsViewModel(problem, _db, CurrentUser);
-            dialog.DataContext = viewModel;
 
-            var desktop = App.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
-            if (desktop?.MainWindow != null)
+            // БЛЯТЬ, ПЕРЕДАЙ closeAction!
+            var viewModel = new ProblemDetailsViewModel(problem, _db, CurrentUser, (changed) =>
             {
-                await dialog.ShowDialog(desktop.MainWindow);
-                // После закрытия окна обновляем данные за текущую дату
-                await LoadDataForDate(_selectedDate);
-            }
-            else
-            {
-                dialog.Show();
-            }
+                if (changed)
+                {
+                    // Обновляем данные, если были изменения
+                    Task.Run(async () => await LoadDataForDate(_selectedDate));
+                }
+                dialog.Close();
+            });
+
+            dialog.DataContext = viewModel;
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            dialog.Show();
         }
         catch (Exception ex)
         {
@@ -220,8 +213,80 @@ public class MonitoringViewModel : ViewModelBase
         }
     }
 
-    public DatabaseService GetDatabaseService()
+    private async Task ShowProblemInfoOnly(Problem problem)
     {
-        return _db;
+        try
+        {
+            var dialog = new Window
+            {
+                Title = "Информация о проблеме",
+                Width = 500,
+                Height = 450,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen
+            };
+
+            var stackPanel = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 10
+            };
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Тип: {problem.Type}",
+                FontSize = 14,
+                FontWeight = Avalonia.Media.FontWeight.Bold
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Трубопровод: {problem.PipelineName}"
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Описание: {problem.Description}",
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Дата: {problem.NotificationDate:dd.MM.yyyy}"
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Показание: {problem.MeasuredValue} (порог: {problem.ThresholdValue})"
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Категория риска: {problem.RiskCategory}"
+            });
+
+            stackPanel.Children.Add(new TextBlock
+            {
+                Text = $"Статус: {problem.Status}",
+                Foreground = Avalonia.Media.Brushes.Gray
+            });
+
+            var closeButton = new Button
+            {
+                Content = "Закрыть",
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Margin = new Avalonia.Thickness(0, 20, 0, 0)
+            };
+            closeButton.Click += (s, e) => dialog.Close();
+            stackPanel.Children.Add(closeButton);
+
+            dialog.Content = stackPanel;
+            dialog.Show();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Ошибка открытия окна информации: {ex.Message}";
+        }
     }
+
+    public DatabaseService GetDatabaseService() => _db;
 }

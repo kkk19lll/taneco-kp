@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia.Controls.ApplicationLifetimes;
 using Taneco.Models;
 using Taneco.Services;
 
@@ -15,19 +14,25 @@ public class MeasurementDetailsViewModel : ViewModelBase
     private Measurement _measurement;
     private ObservableCollection<Measurement> _historyMeasurements;
     private bool _isLoading;
+    private Action? _closeAction;
+    private bool _isLoadingHistory; // Флаг для предотвращения повторной загрузки
+    private int _currentDays; // Текущий выбранный период
 
-    public MeasurementDetailsViewModel(Measurement measurement, DatabaseService db)
+    public MeasurementDetailsViewModel(Measurement measurement, DatabaseService db, Action? closeAction = null)
     {
         _db = db;
         _measurement = measurement;
         _historyMeasurements = new ObservableCollection<Measurement>();
+        _closeAction = closeAction;
+        _currentDays = 7; // По умолчанию неделя
 
-        ShowWeekCommand = new RelayCommand(() => Task.Run(async () => await LoadHistory(7)));
-        ShowMonthCommand = new RelayCommand(() => Task.Run(async () => await LoadHistory(30)));
-        ShowYearCommand = new RelayCommand(() => Task.Run(async () => await LoadHistory(365)));
-        CloseCommand = new RelayCommand(Close);
+        ShowWeekCommand = new RelayCommand(async () => await LoadHistory(7));
+        ShowMonthCommand = new RelayCommand(async () => await LoadHistory(30));
+        ShowYearCommand = new RelayCommand(async () => await LoadHistory(365));
+        CloseCommand = new RelayCommand(() => _closeAction?.Invoke());
 
-        Task.Run(async () => await LoadHistory(7));
+        // Используем асинхронный метод без Task.Run
+        _ = LoadHistoryAsync(7);
     }
 
     public Measurement Measurement
@@ -55,38 +60,56 @@ public class MeasurementDetailsViewModel : ViewModelBase
 
     private async Task LoadHistory(int days)
     {
+        // Если уже загружаем тот же период или идет загрузка - пропускаем
+        if (_isLoadingHistory && _currentDays == days) return;
+
+        _currentDays = days;
+        await LoadHistoryAsync(days);
+    }
+
+    private async Task LoadHistoryAsync(int days)
+    {
+        // Блокируем повторные вызовы
+        if (_isLoadingHistory) return;
+
+        _isLoadingHistory = true;
         IsLoading = true;
+
         try
         {
             var startDate = Measurement.Date.Date.AddDays(-days);
             var endDate = Measurement.Date.Date;
-            
+
             var allMeasurements = await _db.GetAllMeasurementsAsync();
+
+            // Фильтруем и сортируем
             var filtered = allMeasurements
-                .Where(m => m.SensorId == Measurement.SensorId && m.Date >= startDate && m.Date <= endDate)
+                .Where(m => m.SensorId == Measurement.SensorId && m.Date.Date >= startDate && m.Date.Date <= endDate)
                 .OrderByDescending(m => m.Date)
                 .ToList();
-            
-            HistoryMeasurements.Clear();
-            foreach (var m in filtered)
-                HistoryMeasurements.Add(m);
+
+            // Очищаем и добавляем новые данные (все в одном потоке UI)
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                HistoryMeasurements.Clear();
+                foreach (var m in filtered)
+                {
+                    HistoryMeasurements.Add(m);
+                }
+            });
         }
         catch (Exception ex)
         {
             Console.WriteLine($"LoadHistory error: {ex.Message}");
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                HistoryMeasurements.Clear();
+            });
         }
         finally
         {
             IsLoading = false;
-        }
-    }
-
-    private void Close()
-    {
-        if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var window = desktop.Windows.OfType<Views.MeasurementDetailsWindow>().FirstOrDefault();
-            window?.Close();
+            _isLoadingHistory = false;
         }
     }
 }

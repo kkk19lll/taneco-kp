@@ -165,8 +165,9 @@ public class DatabaseService
                 });
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"GetMeasurementsByDateAsync error: {ex.Message}");
         }
         return measurements;
     }
@@ -343,7 +344,7 @@ public class DatabaseService
         return problems;
     }
 
-    // Новый метод для получения активных проблем за конкретную дату
+    // ИСПРАВЛЕННЫЙ метод для получения активных проблем за конкретную дату
     public async Task<ObservableCollection<Problem>> GetActiveProblemsByDateAsync(DateTime date)
     {
         var problems = new ObservableCollection<Problem>();
@@ -380,7 +381,7 @@ public class DatabaseService
         LEFT JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
         LEFT JOIN Проверка p ON up.Код_уведом_проб = p.Код_уведом_проб
         LEFT JOIN Статус_проверки st ON p.Код_статуса_проверки = st.Код_статуса_проверки
-        WHERE up.Дата_уведомления = @date
+        WHERE CAST(up.Дата_уведомления AS DATE) = CAST(@date AS DATE)
         AND (p.Код_проверки IS NULL OR st.Код_статуса_проверки NOT IN (6, 7, 8))
         ORDER BY SortDate DESC, SortTime DESC";
 
@@ -1034,32 +1035,126 @@ public class DatabaseService
         }
     }
 
+    // ИСПРАВЛЕННЫЙ метод для обновления статуса проблемы
     public async Task<bool> UpdateProblemStatusAsync(int problemId, string status)
     {
-        const string query = @"
-            UPDATE Проверка
-            SET Код_статуса_проверки = CASE
-                WHEN @status = 'Завершена' THEN 6
-                WHEN @status = 'В работе' THEN 2
-                WHEN @status = 'Отложена' THEN 7
-                WHEN @status = 'Отменена' THEN 8
-                WHEN @status = 'Ложные показания' THEN 6
-                WHEN @status = 'Запланирована проверка' THEN 1
-                ELSE 1
-            END,
-            Дата_окончания = CASE WHEN @status IN ('Завершена', 'Ложные показания', 'Отменена') THEN CURRENT_DATE ELSE NULL END
-            WHERE Код_уведом_проб = @problemId";
+        const string findInspectionQuery = @"
+        SELECT Код_проверки FROM Проверка 
+        WHERE Код_уведом_проб = @problemId 
+        ORDER BY Код_проверки DESC LIMIT 1";
 
         try
         {
             await using var conn = await GetConnectionAsync();
-            await using var cmd = new NpgsqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@problemId", problemId);
-            cmd.Parameters.AddWithValue("@status", status);
-            return await cmd.ExecuteNonQueryAsync() > 0;
+
+            int? inspectionId = null;
+            await using (var findCmd = new NpgsqlCommand(findInspectionQuery, conn))
+            {
+                findCmd.Parameters.AddWithValue("@problemId", problemId);
+                var result = await findCmd.ExecuteScalarAsync();
+                if (result != null && result != DBNull.Value)
+                {
+                    inspectionId = Convert.ToInt32(result);
+                }
+            }
+
+            if (!inspectionId.HasValue)
+            {
+                Console.WriteLine($"No inspection found for problem {problemId}");
+                return false;
+            }
+
+            int statusId = status switch
+            {
+                "Ложные показания" => 6,
+                "Завершена" => 6,
+                "Требуется ремонт" => 9,
+                "В процессе ремонта" => 9,
+                "Завершен" => 6,
+                "Ожидает подтверждения" => 4,
+                "В процессе выполнения" => 2,
+                _ => 4
+            };
+
+            const string updateQuery = @"
+            UPDATE Проверка
+            SET Код_статуса_проверки = @statusId,
+                Дата_окончания = CASE WHEN @statusId IN (6, 7, 8) THEN CURRENT_DATE ELSE NULL END
+            WHERE Код_проверки = @inspectionId";
+
+            await using var updateCmd = new NpgsqlCommand(updateQuery, conn);
+            updateCmd.Parameters.AddWithValue("@statusId", statusId);
+            updateCmd.Parameters.AddWithValue("@inspectionId", inspectionId.Value);
+
+            int rowsAffected = await updateCmd.ExecuteNonQueryAsync();
+
+            Console.WriteLine($"UpdateProblemStatusAsync: problemId={problemId}, status={status}, statusId={statusId}, rowsAffected={rowsAffected}");
+
+            return rowsAffected > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"UpdateProblemStatusAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
+    // НОВЫЙ метод для обновления статуса проблемы со срочностью
+    public async Task<bool> UpdateProblemStatusWithUrgencyAsync(int problemId, string status, string urgency)
+    {
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            const string findInspectionQuery = @"
+                SELECT Код_проверки FROM Проверка 
+                WHERE Код_уведом_проб = @problemId 
+                ORDER BY Код_проверки DESC LIMIT 1";
+
+            int? inspectionId = null;
+            await using (var findCmd = new NpgsqlCommand(findInspectionQuery, conn))
+            {
+                findCmd.Parameters.AddWithValue("@problemId", problemId);
+                var result = await findCmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    inspectionId = Convert.ToInt32(result);
+                }
+            }
+
+            if (inspectionId.HasValue)
+            {
+                int statusId = status switch
+                {
+                    "Ожидает подтверждения" => 4,
+                    "В процессе выполнения" => 2,
+                    "Ложные показания" => 6,
+                    "Завершена" => 6,
+                    "Требуется ремонт" => 9,
+                    "В процессе ремонта" => 9,
+                    "Завершен" => 6,
+                    _ => 1
+                };
+
+                const string updateQuery = @"
+                    UPDATE Проверка
+                    SET Код_статуса_проверки = @statusId,
+                        Дата_окончания = CASE WHEN @statusId IN (6, 7, 8) THEN CURRENT_DATE ELSE NULL END,
+                        Описание = CONCAT(COALESCE(Описание, ''), ' | Срочность: ', @urgency)
+                    WHERE Код_проверки = @inspectionId";
+
+                await using var updateCmd = new NpgsqlCommand(updateQuery, conn);
+                updateCmd.Parameters.AddWithValue("@statusId", statusId);
+                updateCmd.Parameters.AddWithValue("@inspectionId", inspectionId.Value);
+                updateCmd.Parameters.AddWithValue("@urgency", urgency);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UpdateProblemStatusWithUrgencyAsync error: {ex.Message}");
             return false;
         }
     }
@@ -2848,5 +2943,92 @@ public class DatabaseService
             Console.WriteLine($"GetComprehensiveReportAsync error: {ex.Message}");
         }
         return report;
+    }
+
+    // ИСПРАВЛЕННЫЙ метод для создания проверки со статусом
+    public async Task<bool> CreateInspectionWithStatusAsync(int problemId, int employeeId, string description, string urgency, string status)
+    {
+        const string query = @"
+        INSERT INTO Проверка (Код_проверки, Код_сотр, Код_уведом_проб, Дата_начала, Код_статуса_проверки, Описание)
+        VALUES ((SELECT COALESCE(MAX(Код_проверки), 0) + 1 FROM Проверка),
+                @employeeId, @problemId, CURRENT_DATE, 
+                (SELECT Код_статуса_проверки FROM Статус_проверки WHERE Наименование = @status),
+                @description)";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@employeeId", employeeId);
+            cmd.Parameters.AddWithValue("@problemId", problemId);
+            cmd.Parameters.AddWithValue("@description", $"{description} (Срочность: {urgency})");
+            cmd.Parameters.AddWithValue("@status", status);
+            int result = await cmd.ExecuteNonQueryAsync();
+
+            if (result > 0)
+            {
+                // Также обновляем статус проблемы
+                await UpdateProblemStatusWithUrgencyAsync(problemId, status, urgency);
+            }
+
+            return result > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CreateInspectionWithStatusAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<ObservableCollection<InspectorItem>> GetInspectorsAsync()
+    {
+        var inspectors = new ObservableCollection<InspectorItem>();
+        const string query = @"
+        SELECT Код_сотр, TRIM(CONCAT(Фамилия, ' ', Имя, ' ', COALESCE(Отчество, ''))) as FullName
+        FROM Сотрудник
+        WHERE Код_должности IN (SELECT Код_должности FROM Должность WHERE Роль_в_приложении = 'Инспектор')
+        AND Активен = true";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                inspectors.Add(new InspectorItem { Id = reader.GetInt32(0), FullName = reader.GetString(1).Trim() });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetInspectorsAsync error: {ex.Message}");
+        }
+        return inspectors;
+    }
+
+    public async Task<ObservableCollection<RepairManagerItem>> GetRepairManagersAsync()
+    {
+        var managers = new ObservableCollection<RepairManagerItem>();
+        const string query = @"
+        SELECT Код_сотр, TRIM(CONCAT(Фамилия, ' ', Имя, ' ', COALESCE(Отчество, ''))) as FullName
+        FROM Сотрудник
+        WHERE Код_должности IN (SELECT Код_должности FROM Должность WHERE Роль_в_приложении = 'Начальник_ремонтной_службы')
+        AND Активен = true";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                managers.Add(new RepairManagerItem { Id = reader.GetInt32(0), FullName = reader.GetString(1).Trim() });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetRepairManagersAsync error: {ex.Message}");
+        }
+        return managers;
     }
 }
