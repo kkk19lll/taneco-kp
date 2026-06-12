@@ -237,17 +237,17 @@ public class DatabaseService
     {
         var pipelines = new ObservableCollection<Pipeline>();
         const string query = @"
-            SELECT
-                t.Код_трубопровода,
-                t.Наименование,
-                t.Дата_установки,
-                m.Наименование as Материал,
-                vt.Протяженность,
-                vt.Диаметр
-            FROM Трубопровод t
-            JOIN Вид_трубопровода vt ON t.Код_вида_труб = vt.Код_вида_труб
-            JOIN Материал m ON vt.Код_материала = m.Код_материала
-            ORDER BY t.Код_трубопровода";
+        SELECT
+            t.Код_трубопровода,
+            t.Наименование,
+            t.Дата_установки,
+            m.Наименование as Материал,
+            vt.Протяженность,
+            vt.Диаметр
+        FROM Трубопровод t
+        JOIN Вид_трубопровода vt ON t.Код_вида_труб = vt.Код_вида_труб
+        JOIN Материал m ON vt.Код_материала = m.Код_материала
+        ORDER BY t.Код_трубопровода";
 
         try
         {
@@ -256,7 +256,7 @@ public class DatabaseService
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                pipelines.Add(new Pipeline
+                var pipeline = new Pipeline
                 {
                     Id = reader.GetInt32(0),
                     Name = reader.GetString(1),
@@ -264,11 +264,14 @@ public class DatabaseService
                     Material = reader.GetString(3),
                     Length = reader.GetDecimal(4),
                     Diameter = reader.GetDecimal(5)
-                });
+                };
+                Console.WriteLine($"Загружен трубопровод: ID={pipeline.Id}, Name={pipeline.Name}, InstallationDate={pipeline.InstallationDate}");
+                pipelines.Add(pipeline);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"GetPipelinesAsync error: {ex.Message}");
         }
         return pipelines;
     }
@@ -344,7 +347,6 @@ public class DatabaseService
         return problems;
     }
 
-    // ИСПРАВЛЕННЫЙ метод для получения активных проблем за конкретную дату
     public async Task<ObservableCollection<Problem>> GetActiveProblemsByDateAsync(DateTime date)
     {
         var problems = new ObservableCollection<Problem>();
@@ -1035,7 +1037,6 @@ public class DatabaseService
         }
     }
 
-    // ИСПРАВЛЕННЫЙ метод для обновления статуса проблемы
     public async Task<bool> UpdateProblemStatusAsync(int problemId, string status)
     {
         const string findInspectionQuery = @"
@@ -1099,7 +1100,6 @@ public class DatabaseService
         }
     }
 
-    // НОВЫЙ метод для обновления статуса проблемы со срочностью
     public async Task<bool> UpdateProblemStatusWithUrgencyAsync(int problemId, string status, string urgency)
     {
         try
@@ -1972,13 +1972,16 @@ public class DatabaseService
     }
 
     public async Task<bool> CreateSensorAsync(string controlPoint, string model, string manufacturer, string country,
-        string sensorType, string measurementType, string unit, string minValue, string maxValue,
-        int pipelineId, string location, string productionYear)
+    string sensorType, string measurementType, string unit, string minValue, string maxValue,
+    int pipelineId, string location, string productionYear)
     {
         try
         {
+            Console.WriteLine($"CreateSensorAsync started: controlPoint={controlPoint}, model={model}, pipelineId={pipelineId}, location={location}");
+
             await using var conn = await GetConnectionAsync();
 
+            // Получаем или создаем производителя
             int manufacturerId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_производ FROM Производитель WHERE Наименование = @name", conn))
             {
@@ -1999,6 +2002,7 @@ public class DatabaseService
                 }
             }
 
+            // Получаем или создаем модель
             int modelId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_модели FROM Модель WHERE Наименование = @name", conn))
             {
@@ -2019,6 +2023,7 @@ public class DatabaseService
                 }
             }
 
+            // Получаем ID типа датчика
             int sensorTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_типа_дат FROM Тип_датчика WHERE Наименование = @name", conn))
             {
@@ -2027,6 +2032,7 @@ public class DatabaseService
                 sensorTypeId = result != null ? (int)result : 1;
             }
 
+            // Получаем ID типа измерения
             int measurementTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_измер_дат FROM Измерение_датчика WHERE Наименование = @name", conn))
             {
@@ -2035,6 +2041,7 @@ public class DatabaseService
                 measurementTypeId = result != null ? (int)result : 1;
             }
 
+            // Получаем ID единицы измерения
             int unitId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_ед_измер FROM Единица_измерения WHERE Наименование = @name", conn))
             {
@@ -2043,6 +2050,7 @@ public class DatabaseService
                 unitId = result != null ? (int)result : 1;
             }
 
+            // Получаем или создаем особенности измерения
             int measurementFeatureId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_особ_измер_дат FROM Особенности_измерения WHERE Код_измер_дат = @measurementTypeId AND Код_ед_измер = @unitId", conn))
             {
@@ -2065,6 +2073,7 @@ public class DatabaseService
                 }
             }
 
+            // Создаем работу датчика
             int workId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Работа_датчика (Код_раб_дат, Описание, Минимальное_значение, Максимальное_значение) VALUES ((SELECT COALESCE(MAX(Код_раб_дат), 0) + 1 FROM Работа_датчика), @description, @minValue, @maxValue) RETURNING Код_раб_дат", conn))
             {
@@ -2074,6 +2083,7 @@ public class DatabaseService
                 workId = (int)(await cmd.ExecuteScalarAsync() ?? 1);
             }
 
+            // Создаем особенности датчика
             int sensorFeatureId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Особенности_датчика (Код_особ_дат, Код_раб_дат, Код_типа_дат) VALUES ((SELECT COALESCE(MAX(Код_особ_дат), 0) + 1 FROM Особенности_датчика), @workId, @sensorTypeId) RETURNING Код_особ_дат", conn))
             {
@@ -2084,6 +2094,7 @@ public class DatabaseService
 
             int year = string.IsNullOrEmpty(productionYear) ? 0 : int.Parse(productionYear);
 
+            // Создаем датчик
             int sensorId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Датчик (Код_датчика, Код_модели, Код_особ_дат, Код_особ_измер_дат, Точка_контроля, Год_выпуска) VALUES ((SELECT COALESCE(MAX(Код_датчика), 0) + 1 FROM Датчик), @modelId, @sensorFeatureId, @measurementFeatureId, @controlPoint, @year) RETURNING Код_датчика", conn))
             {
@@ -2095,40 +2106,121 @@ public class DatabaseService
                 sensorId = (int)(await cmd.ExecuteScalarAsync() ?? 1);
             }
 
-            if (pipelineId > 0 && !string.IsNullOrEmpty(location))
+            Console.WriteLine($"Датчик создан с ID: {sensorId}");
+
+            // Создаем связь с трубопроводом, только если pipelineId > 0
+            if (pipelineId > 0)
             {
-                await using (var cmd = new NpgsqlCommand("INSERT INTO Датчик_трубопровод (Код_дат_труб, Код_датчика, Код_трубопровода, Дата_установки, Местоположение) VALUES ((SELECT COALESCE(MAX(Код_дат_труб), 0) + 1 FROM Датчик_трубопровод), @sensorId, @pipelineId, CURRENT_DATE, @location)", conn))
+                string finalLocation = string.IsNullOrEmpty(location) ? "Не указано" : location;
+
+                await using (var cmd = new NpgsqlCommand(@"
+                INSERT INTO Датчик_трубопровод (Код_дат_труб, Код_датчика, Код_трубопровода, Дата_установки, Местоположение) 
+                VALUES ((SELECT COALESCE(MAX(Код_дат_труб), 0) + 1 FROM Датчик_трубопровод), 
+                        @sensorId, @pipelineId, CURRENT_DATE, @location)", conn))
                 {
                     cmd.Parameters.AddWithValue("@sensorId", sensorId);
                     cmd.Parameters.AddWithValue("@pipelineId", pipelineId);
-                    cmd.Parameters.AddWithValue("@location", location);
+                    cmd.Parameters.AddWithValue("@location", finalLocation);
                     await cmd.ExecuteNonQueryAsync();
+                    Console.WriteLine($"Создана связь датчика {sensorId} с трубопроводом {pipelineId}, локация: {finalLocation}");
                 }
+            }
+            else
+            {
+                Console.WriteLine($"Датчик {sensorId} создан без привязки к трубопроводу");
             }
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"CreateSensorAsync error: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
             return false;
         }
     }
 
+    // ИСПРАВЛЕННЫЙ метод CreatePipelineAsync с проверками заполненных полей
     public async Task<bool> CreatePipelineAsync(string name, string material, string length, string diameter, DateTime installationDate)
     {
         try
         {
+            Console.WriteLine($"CreatePipelineAsync started: name={name}, material={material}, length={length}, diameter={diameter}, date={installationDate}");
+
+            // Проверка обязательных полей
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                Console.WriteLine("Ошибка: Наименование трубопровода не заполнено");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(material))
+            {
+                Console.WriteLine("Ошибка: Материал трубопровода не заполнен");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(length))
+            {
+                Console.WriteLine("Ошибка: Протяженность трубопровода не заполнена");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(diameter))
+            {
+                Console.WriteLine("Ошибка: Диаметр трубопровода не заполнен");
+                return false;
+            }
+
+            // Парсинг числовых значений
+            if (!decimal.TryParse(length.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal parsedLength))
+            {
+                Console.WriteLine($"Ошибка: Некорректное значение протяженности: '{length}'");
+                return false;
+            }
+
+            if (parsedLength <= 0)
+            {
+                Console.WriteLine($"Ошибка: Протяженность должна быть больше 0: {parsedLength}");
+                return false;
+            }
+
+            if (!decimal.TryParse(diameter.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal parsedDiameter))
+            {
+                Console.WriteLine($"Ошибка: Некорректное значение диаметра: '{diameter}'");
+                return false;
+            }
+
+            if (parsedDiameter <= 0)
+            {
+                Console.WriteLine($"Ошибка: Диаметр должен быть больше 0: {parsedDiameter}");
+                return false;
+            }
+
+            // Проверка даты
+            if (installationDate == default || installationDate > DateTime.Today)
+            {
+                Console.WriteLine($"Ошибка: Некорректная дата установки: {installationDate}");
+                return false;
+            }
+
             await using var conn = await GetConnectionAsync();
 
+            // Получаем ID материала
             int materialId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_материала FROM Материал WHERE Наименование = @name", conn))
             {
                 cmd.Parameters.AddWithValue("@name", material);
                 var result = await cmd.ExecuteScalarAsync();
-                if (result == null) return false;
+                if (result == null)
+                {
+                    Console.WriteLine($"Ошибка: Материал '{material}' не найден в справочнике");
+                    return false;
+                }
                 materialId = (int)result;
             }
 
+            // Получаем или создаем вид трубопровода
             int viewId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_вида_труб FROM Вид_трубопровода WHERE Код_материала = @materialId", conn))
             {
@@ -2137,38 +2229,62 @@ public class DatabaseService
                 if (result != null)
                 {
                     viewId = (int)result;
+                    // Обновляем существующую запись
                     await using (var updateCmd = new NpgsqlCommand("UPDATE Вид_трубопровода SET Протяженность = @length, Диаметр = @diameter WHERE Код_вида_труб = @viewId", conn))
                     {
-                        updateCmd.Parameters.AddWithValue("@length", decimal.Parse(length));
-                        updateCmd.Parameters.AddWithValue("@diameter", decimal.Parse(diameter));
+                        updateCmd.Parameters.AddWithValue("@length", parsedLength);
+                        updateCmd.Parameters.AddWithValue("@diameter", parsedDiameter);
                         updateCmd.Parameters.AddWithValue("@viewId", viewId);
                         await updateCmd.ExecuteNonQueryAsync();
+                        Console.WriteLine($"Обновлен вид трубопровода: ID={viewId}, length={parsedLength}, diameter={parsedDiameter}");
                     }
                 }
                 else
                 {
-                    await using (var insertCmd = new NpgsqlCommand("INSERT INTO Вид_трубопровода (Код_вида_труб, Код_материала, Протяженность, Диаметр) VALUES ((SELECT COALESCE(MAX(Код_вида_труб), 0) + 1 FROM Вид_трубопровода), @materialId, @length, @diameter) RETURNING Код_вида_труб", conn))
+                    // Создаем новый вид трубопровода
+                    await using (var insertCmd = new NpgsqlCommand(@"
+                        INSERT INTO Вид_трубопровода (Код_вида_труб, Код_материала, Протяженность, Диаметр) 
+                        VALUES ((SELECT COALESCE(MAX(Код_вида_труб), 0) + 1 FROM Вид_трубопровода), @materialId, @length, @diameter) 
+                        RETURNING Код_вида_труб", conn))
                     {
                         insertCmd.Parameters.AddWithValue("@materialId", materialId);
-                        insertCmd.Parameters.AddWithValue("@length", decimal.Parse(length));
-                        insertCmd.Parameters.AddWithValue("@diameter", decimal.Parse(diameter));
+                        insertCmd.Parameters.AddWithValue("@length", parsedLength);
+                        insertCmd.Parameters.AddWithValue("@diameter", parsedDiameter);
                         viewId = (int)(await insertCmd.ExecuteScalarAsync() ?? 1);
+                        Console.WriteLine($"Создан новый вид трубопровода: ID={viewId}");
                     }
                 }
             }
 
-            await using (var cmd = new NpgsqlCommand("INSERT INTO Трубопровод (Код_трубопровода, Наименование, Дата_установки, Код_вида_труб) VALUES ((SELECT COALESCE(MAX(Код_трубопровода), 0) + 1 FROM Трубопровод), @name, @date, @viewId)", conn))
+            // Проверяем, существует ли трубопровод с таким именем
+            await using (var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM Трубопровод WHERE Наименование = @name", conn))
+            {
+                checkCmd.Parameters.AddWithValue("@name", name);
+                long existingCount = (long)(await checkCmd.ExecuteScalarAsync() ?? 0);
+                if (existingCount > 0)
+                {
+                    Console.WriteLine($"Ошибка: Трубопровод с именем '{name}' уже существует");
+                    return false;
+                }
+            }
+
+            // Создаем трубопровод
+            await using (var cmd = new NpgsqlCommand(@"
+                INSERT INTO Трубопровод (Код_трубопровода, Наименование, Дата_установки, Код_вида_труб) 
+                VALUES ((SELECT COALESCE(MAX(Код_трубопровода), 0) + 1 FROM Трубопровод), @name, @date, @viewId)", conn))
             {
                 cmd.Parameters.AddWithValue("@name", name);
                 cmd.Parameters.AddWithValue("@date", installationDate);
                 cmd.Parameters.AddWithValue("@viewId", viewId);
-                await cmd.ExecuteNonQueryAsync();
+                int rowsAffected = await cmd.ExecuteNonQueryAsync();
+                Console.WriteLine($"Трубопровод создан: rowsAffected={rowsAffected}");
+                return rowsAffected > 0;
             }
-
-            return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"CreatePipelineAsync error: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
             return false;
         }
     }
@@ -2945,7 +3061,6 @@ public class DatabaseService
         return report;
     }
 
-    // ИСПРАВЛЕННЫЙ метод для создания проверки со статусом
     public async Task<bool> CreateInspectionWithStatusAsync(int problemId, int employeeId, string description, string urgency, string status)
     {
         const string query = @"
@@ -2967,7 +3082,6 @@ public class DatabaseService
 
             if (result > 0)
             {
-                // Также обновляем статус проблемы
                 await UpdateProblemStatusWithUrgencyAsync(problemId, status, urgency);
             }
 
@@ -3030,5 +3144,299 @@ public class DatabaseService
             Console.WriteLine($"GetRepairManagersAsync error: {ex.Message}");
         }
         return managers;
+    }
+
+    public async Task<bool> UpdatePipelineAsync(int pipelineId, string name, string material, string length, string diameter, DateTime installationDate)
+    {
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            int materialId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_материала FROM Материал WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", material);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null) return false;
+                materialId = (int)result;
+            }
+
+            int viewId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_вида_труб FROM Вид_трубопровода WHERE Код_материала = @materialId", conn))
+            {
+                cmd.Parameters.AddWithValue("@materialId", materialId);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    viewId = (int)result;
+                    await using (var updateCmd = new NpgsqlCommand("UPDATE Вид_трубопровода SET Протяженность = @length, Диаметр = @diameter WHERE Код_вида_труб = @viewId", conn))
+                    {
+                        updateCmd.Parameters.AddWithValue("@length", decimal.Parse(length));
+                        updateCmd.Parameters.AddWithValue("@diameter", decimal.Parse(diameter));
+                        updateCmd.Parameters.AddWithValue("@viewId", viewId);
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                }
+                else
+                {
+                    await using (var insertCmd = new NpgsqlCommand("INSERT INTO Вид_трубопровода (Код_вида_труб, Код_материала, Протяженность, Диаметр) VALUES ((SELECT COALESCE(MAX(Код_вида_труб), 0) + 1 FROM Вид_трубопровода), @materialId, @length, @diameter) RETURNING Код_вида_труб", conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@materialId", materialId);
+                        insertCmd.Parameters.AddWithValue("@length", decimal.Parse(length));
+                        insertCmd.Parameters.AddWithValue("@diameter", decimal.Parse(diameter));
+                        viewId = (int)(await insertCmd.ExecuteScalarAsync() ?? 1);
+                    }
+                }
+            }
+
+            await using (var cmd = new NpgsqlCommand("UPDATE Трубопровод SET Наименование = @name, Дата_установки = @date, Код_вида_труб = @viewId WHERE Код_трубопровода = @pipelineId", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", name);
+                cmd.Parameters.AddWithValue("@date", installationDate);
+                cmd.Parameters.AddWithValue("@viewId", viewId);
+                cmd.Parameters.AddWithValue("@pipelineId", pipelineId);
+                return await cmd.ExecuteNonQueryAsync() > 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UpdatePipelineAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateSensorAsync(int sensorId, string controlPoint, string model, string manufacturer, string country,
+    string sensorType, string measurementType, string unit, string minValue, string maxValue,
+    string controlPointName, string pipelineName, string location, string productionYear)
+    {
+        try
+        {
+            Console.WriteLine($"UpdateSensorAsync started: sensorId={sensorId}, model={model}, sensorType={sensorType}, pipelineName={pipelineName}, location={location}");
+
+            await using var conn = await GetConnectionAsync();
+
+            // Получаем или создаем производителя
+            int manufacturerId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_производ FROM Производитель WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", manufacturer);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    manufacturerId = (int)result;
+                }
+                else
+                {
+                    await using (var insertCmd = new NpgsqlCommand("INSERT INTO Производитель (Код_производ, Наименование, Страна) VALUES ((SELECT COALESCE(MAX(Код_производ), 0) + 1 FROM Производитель), @name, @country) RETURNING Код_производ", conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@name", manufacturer);
+                        insertCmd.Parameters.AddWithValue("@country", country ?? "");
+                        manufacturerId = (int)(await insertCmd.ExecuteScalarAsync() ?? 1);
+                    }
+                }
+            }
+
+            // Получаем или создаем модель
+            int modelId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_модели FROM Модель WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", model);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    modelId = (int)result;
+                }
+                else
+                {
+                    await using (var insertCmd = new NpgsqlCommand("INSERT INTO Модель (Код_модели, Наименование, Код_производ) VALUES ((SELECT COALESCE(MAX(Код_модели), 0) + 1 FROM Модель), @name, @manufacturerId) RETURNING Код_модели", conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@name", model);
+                        insertCmd.Parameters.AddWithValue("@manufacturerId", manufacturerId);
+                        modelId = (int)(await insertCmd.ExecuteScalarAsync() ?? 1);
+                    }
+                }
+            }
+
+            // Получаем ID типа датчика
+            int sensorTypeId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_типа_дат FROM Тип_датчика WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", sensorType);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null)
+                {
+                    Console.WriteLine($"Тип датчика '{sensorType}' не найден в справочнике");
+                    return false;
+                }
+                sensorTypeId = (int)result;
+            }
+
+            // Получаем ID типа измерения
+            int measurementTypeId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_измер_дат FROM Измерение_датчика WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", measurementType);
+                var result = await cmd.ExecuteScalarAsync();
+                measurementTypeId = result != null ? (int)result : 1;
+            }
+
+            // Получаем ID единицы измерения
+            int unitId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_ед_измер FROM Единица_измерения WHERE Наименование = @name", conn))
+            {
+                cmd.Parameters.AddWithValue("@name", unit);
+                var result = await cmd.ExecuteScalarAsync();
+                unitId = result != null ? (int)result : 1;
+            }
+
+            // Получаем или создаем особенности измерения
+            int measurementFeatureId;
+            await using (var cmd = new NpgsqlCommand("SELECT Код_особ_измер_дат FROM Особенности_измерения WHERE Код_измер_дат = @measurementTypeId AND Код_ед_измер = @unitId", conn))
+            {
+                cmd.Parameters.AddWithValue("@measurementTypeId", measurementTypeId);
+                cmd.Parameters.AddWithValue("@unitId", unitId);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    measurementFeatureId = (int)result;
+                }
+                else
+                {
+                    await using (var insertCmd = new NpgsqlCommand("INSERT INTO Особенности_измерения (Код_особ_измер_дат, Наименование, Код_измер_дат, Код_ед_измер) VALUES ((SELECT COALESCE(MAX(Код_особ_измер_дат), 0) + 1 FROM Особенности_измерения), @name, @measurementTypeId, @unitId) RETURNING Код_особ_измер_дат", conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@name", $"{measurementType} через {unit}");
+                        insertCmd.Parameters.AddWithValue("@measurementTypeId", measurementTypeId);
+                        insertCmd.Parameters.AddWithValue("@unitId", unitId);
+                        measurementFeatureId = (int)(await insertCmd.ExecuteScalarAsync() ?? 1);
+                    }
+                }
+            }
+
+            // Обновляем пороги датчика
+            await using (var cmd = new NpgsqlCommand(@"
+            UPDATE Работа_датчика 
+            SET Минимальное_значение = @minValue, Максимальное_значение = @maxValue
+            WHERE Код_раб_дат = (SELECT od.Код_раб_дат FROM Особенности_датчика od WHERE od.Код_особ_дат = 
+                (SELECT Код_особ_дат FROM Датчик WHERE Код_датчика = @sensorId))", conn))
+            {
+                cmd.Parameters.AddWithValue("@minValue", decimal.Parse(minValue, System.Globalization.CultureInfo.InvariantCulture));
+                cmd.Parameters.AddWithValue("@maxValue", decimal.Parse(maxValue, System.Globalization.CultureInfo.InvariantCulture));
+                cmd.Parameters.AddWithValue("@sensorId", sensorId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            // Обновляем тип датчика в таблице Особенности_датчика
+            await using (var cmd = new NpgsqlCommand(@"
+            UPDATE Особенности_датчика 
+            SET Код_типа_дат = @sensorTypeId
+            WHERE Код_особ_дат = (SELECT Код_особ_дат FROM Датчик WHERE Код_датчика = @sensorId)", conn))
+            {
+                cmd.Parameters.AddWithValue("@sensorTypeId", sensorTypeId);
+                cmd.Parameters.AddWithValue("@sensorId", sensorId);
+                int rowsAffected = await cmd.ExecuteNonQueryAsync();
+                Console.WriteLine($"Обновлен тип датчика: sensorTypeId={sensorTypeId}, rowsAffected={rowsAffected}");
+            }
+
+            // Обновляем датчик
+            int year = string.IsNullOrEmpty(productionYear) ? 0 : int.Parse(productionYear);
+            await using (var cmd = new NpgsqlCommand(@"
+            UPDATE Датчик 
+            SET Код_модели = @modelId, Код_особ_измер_дат = @measurementFeatureId, 
+                Точка_контроля = @controlPoint, Год_выпуска = @year
+            WHERE Код_датчика = @sensorId", conn))
+            {
+                cmd.Parameters.AddWithValue("@modelId", modelId);
+                cmd.Parameters.AddWithValue("@measurementFeatureId", measurementFeatureId);
+                cmd.Parameters.AddWithValue("@controlPoint", controlPoint ?? "");
+                cmd.Parameters.AddWithValue("@year", year);
+                cmd.Parameters.AddWithValue("@sensorId", sensorId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            // Обновляем связь с трубопроводом
+            string finalLocation = string.IsNullOrEmpty(location) ? "Не указано" : location;
+
+            await using (var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM Датчик_трубопровод WHERE Код_датчика = @sensorId", conn))
+            {
+                checkCmd.Parameters.AddWithValue("@sensorId", sensorId);
+                long count = (long)(await checkCmd.ExecuteScalarAsync() ?? 0);
+
+                if (count > 0)
+                {
+                    if (!string.IsNullOrEmpty(pipelineName) && pipelineName != "(Не установлен)" && pipelineName != "Не установлен")
+                    {
+                        int pipelineId;
+                        await using (var getPipelineCmd = new NpgsqlCommand("SELECT Код_трубопровода FROM Трубопровод WHERE Наименование = @name", conn))
+                        {
+                            getPipelineCmd.Parameters.AddWithValue("@name", pipelineName);
+                            var result = await getPipelineCmd.ExecuteScalarAsync();
+                            if (result != null)
+                            {
+                                pipelineId = (int)result;
+                                await using (var updateCmd = new NpgsqlCommand(@"
+                                UPDATE Датчик_трубопровод 
+                                SET Код_трубопровода = @pipelineId, Местоположение = @location 
+                                WHERE Код_датчика = @sensorId", conn))
+                                {
+                                    updateCmd.Parameters.AddWithValue("@pipelineId", pipelineId);
+                                    updateCmd.Parameters.AddWithValue("@location", finalLocation);
+                                    updateCmd.Parameters.AddWithValue("@sensorId", sensorId);
+                                    await updateCmd.ExecuteNonQueryAsync();
+                                    Console.WriteLine($"Обновлена связь датчика {sensorId} с трубопроводом {pipelineId}");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await using (var clearCmd = new NpgsqlCommand(@"
+                        UPDATE Датчик_трубопровод 
+                        SET Код_трубопровода = NULL, Местоположение = @location 
+                        WHERE Код_датчика = @sensorId", conn))
+                        {
+                            clearCmd.Parameters.AddWithValue("@location", finalLocation);
+                            clearCmd.Parameters.AddWithValue("@sensorId", sensorId);
+                            await clearCmd.ExecuteNonQueryAsync();
+                            Console.WriteLine($"Очищена связь датчика {sensorId} с трубопроводом");
+                        }
+                    }
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(pipelineName) && pipelineName != "(Не установлен)" && pipelineName != "Не установлен")
+                    {
+                        await using (var getPipelineCmd = new NpgsqlCommand("SELECT Код_трубопровода FROM Трубопровод WHERE Наименование = @name", conn))
+                        {
+                            getPipelineCmd.Parameters.AddWithValue("@name", pipelineName);
+                            var result = await getPipelineCmd.ExecuteScalarAsync();
+                            if (result != null)
+                            {
+                                int pipelineId = (int)result;
+                                await using (var insertCmd = new NpgsqlCommand(@"
+                                INSERT INTO Датчик_трубопровод (Код_дат_труб, Код_датчика, Код_трубопровода, Дата_установки, Местоположение) 
+                                VALUES ((SELECT COALESCE(MAX(Код_дат_труб), 0) + 1 FROM Датчик_трубопровод), 
+                                        @sensorId, @pipelineId, CURRENT_DATE, @location)", conn))
+                                {
+                                    insertCmd.Parameters.AddWithValue("@sensorId", sensorId);
+                                    insertCmd.Parameters.AddWithValue("@pipelineId", pipelineId);
+                                    insertCmd.Parameters.AddWithValue("@location", finalLocation);
+                                    await insertCmd.ExecuteNonQueryAsync();
+                                    Console.WriteLine($"Создана связь датчика {sensorId} с трубопроводом {pipelineId}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine($"UpdateSensorAsync completed successfully for sensor {sensorId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UpdateSensorAsync error: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
+            return false;
+        }
     }
 }

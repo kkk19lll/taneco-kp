@@ -51,6 +51,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/Users/kkk19lll/Downloads/Taneco 1/Taneco/Views/CreateSensorWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/Users/kkk19lll/Downloads/Taneco 1/Taneco/Views/EquipmentEditWindow.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/Users/kkk19lll/Downloads/Taneco 1/Taneco/Views/EquipmentManagementView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 

@@ -1,17 +1,21 @@
-// ViewModels/EquipmentManagementViewModel.cs
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Taneco.Models;
 using Taneco.Services;
+using Taneco.Views;
 
 namespace Taneco.ViewModels;
 
 public class EquipmentManagementViewModel : ViewModelBase
 {
     private readonly DatabaseService _databaseService;
+    private readonly Window _parentWindow;
     private User? _currentUser;
     private ObservableCollection<Equipment> _allEquipmentList = new();
     private ObservableCollection<Equipment> _filteredEquipmentList = new();
@@ -34,17 +38,30 @@ public class EquipmentManagementViewModel : ViewModelBase
     private bool _isSensorSelected;
     private bool _isPipelineSelected;
 
-    public EquipmentManagementViewModel()
+    public EquipmentManagementViewModel(Window parentWindow)
     {
         _databaseService = new DatabaseService();
+        _parentWindow = parentWindow ?? throw new ArgumentNullException(nameof(parentWindow));
         RefreshDataCommand = new RelayCommand(_ => RefreshData());
+        CreateEquipmentCommand = new RelayCommand(_ => OpenCreateWindow());
+        EditEquipmentCommand = new RelayCommand(_ => OpenEditWindow());
     }
 
     public User? CurrentUser
     {
         get => _currentUser;
-        set => SetProperty(ref _currentUser, value);
+        set
+        {
+            SetProperty(ref _currentUser, value);
+            OnPropertyChanged(nameof(CanCreateEquipment));
+            OnPropertyChanged(nameof(CanEditEquipment));
+            (CreateEquipmentCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (EditEquipmentCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
     }
+
+    public bool CanCreateEquipment => _currentUser != null && _currentUser.Role == "Инженер_КИПиА";
+    public bool CanEditEquipment => _currentUser != null && _currentUser.Role == "Инженер_КИПиА" && SelectedEquipment != null;
 
     public ObservableCollection<Equipment> FilteredEquipmentList
     {
@@ -58,12 +75,14 @@ public class EquipmentManagementViewModel : ViewModelBase
         set
         {
             SetProperty(ref _selectedEquipment, value);
+            OnPropertyChanged(nameof(CanEditEquipment));
+            (EditEquipmentCommand as RelayCommand)?.RaiseCanExecuteChanged();
+
             if (value != null)
             {
                 ShowDetailsPanel = true;
                 SelectedEquipmentDetails = value;
 
-                // Заполняем основные поля для отображения
                 if (value.IsPipeline)
                 {
                     IsPipelineSelected = true;
@@ -207,6 +226,8 @@ public class EquipmentManagementViewModel : ViewModelBase
     }
 
     public ICommand RefreshDataCommand { get; }
+    public ICommand CreateEquipmentCommand { get; }
+    public ICommand EditEquipmentCommand { get; }
 
     private void ApplyFilter()
     {
@@ -234,12 +255,123 @@ public class EquipmentManagementViewModel : ViewModelBase
         EquipmentCountText = $"Всего: {FilteredEquipmentList.Count}";
     }
 
+    private async void OpenCreateWindow()
+    {
+        if (!CanCreateEquipment)
+        {
+            await ShowAccessDeniedDialog();
+            return;
+        }
+
+        if (_parentWindow == null || !_parentWindow.IsVisible)
+        {
+            Console.WriteLine("Parent window is null or not visible");
+            return;
+        }
+
+        try
+        {
+            var window = new EquipmentEditWindow();
+            var viewModel = new EquipmentEditViewModel(window, true, null, _currentUser);
+            window.DataContext = viewModel;
+
+            window.Closed += async (s, e) =>
+            {
+                if (window.IsResult)
+                {
+                    await LoadEquipmentAsync();
+                }
+            };
+
+            await window.ShowDialog(_parentWindow);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"OpenCreateWindow error: {ex.Message}");
+        }
+    }
+
+    private async void OpenEditWindow()
+    {
+        if (!CanEditEquipment)
+        {
+            await ShowAccessDeniedDialog();
+            return;
+        }
+
+        if (SelectedEquipment == null) return;
+
+        if (_parentWindow == null || !_parentWindow.IsVisible)
+        {
+            Console.WriteLine("Parent window is null or not visible");
+            return;
+        }
+
+        try
+        {
+            var window = new EquipmentEditWindow();
+            var viewModel = new EquipmentEditViewModel(window, false, SelectedEquipment, _currentUser);
+            window.DataContext = viewModel;
+
+            window.Closed += async (s, e) =>
+            {
+                if (window.IsResult)
+                {
+                    await LoadEquipmentAsync();
+                    SelectedEquipment = FilteredEquipmentList.FirstOrDefault(e => e.Id == SelectedEquipment?.Id);
+                }
+            };
+
+            await window.ShowDialog(_parentWindow);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"OpenEditWindow error: {ex.Message}");
+        }
+    }
+
+    private async Task ShowAccessDeniedDialog()
+    {
+        var dialog = new Window
+        {
+            Title = "Доступ запрещен",
+            Width = 350,
+            Height = 150,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 15,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "Редактирование и добавление оборудования доступно только инженерам КИПиА!",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        MaxWidth = 300
+                    },
+                    new Button
+                    {
+                        Content = "OK",
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                        Width = 80
+                    }
+                }
+            }
+        };
+
+        var button = (Button)((StackPanel)dialog.Content).Children[1];
+        button.Click += (_, _) => dialog.Close();
+
+        await dialog.ShowDialog(_parentWindow);
+    }
+
     public async Task LoadEquipmentAsync()
     {
         IsLoading = true;
         try
         {
-            if (SelectedTabIndex == 1) // Датчики
+            if (SelectedTabIndex == 1)
             {
                 DetailsTitle = "Информация о датчике";
                 EmptySelectionText = "Выберите датчик из списка слева для просмотра детальной информации";
@@ -252,10 +384,8 @@ public class EquipmentManagementViewModel : ViewModelBase
                     {
                         Id = sensor.Id,
                         IsPipeline = false,
-                        // Только модель и точка контроля
                         DisplayName = sensor.Model,
                         DisplayDetail = sensor.ControlPoint,
-                        // Остальные поля для деталей
                         Model = sensor.Model,
                         ControlPoint = sensor.ControlPoint,
                         Type = sensor.Type,
@@ -272,7 +402,7 @@ public class EquipmentManagementViewModel : ViewModelBase
                     });
                 }
             }
-            else // Трубопроводы (только название и протяженность)
+            else
             {
                 DetailsTitle = "Информация о трубопроводе";
                 EmptySelectionText = "Выберите трубопровод из списка слева для просмотра детальной информации";
@@ -281,14 +411,13 @@ public class EquipmentManagementViewModel : ViewModelBase
                 _allEquipmentList.Clear();
                 foreach (var pipeline in pipelines)
                 {
+                    Console.WriteLine($"Загружен трубопровод: {pipeline.Name}, Дата: {pipeline.InstallationDate}");
                     _allEquipmentList.Add(new Equipment
                     {
                         Id = pipeline.Id,
                         IsPipeline = true,
-                        // Только название и протяженность
                         DisplayName = pipeline.Name,
                         DisplayDetail = $"{pipeline.Length} м",
-                        // Остальные поля для деталей
                         Length = pipeline.Length,
                         Diameter = pipeline.Diameter,
                         InstallationDate = pipeline.InstallationDate,
@@ -314,7 +443,7 @@ public class EquipmentManagementViewModel : ViewModelBase
     {
         try
         {
-            if (!isPipeline) // Датчики - последний замер
+            if (!isPipeline)
             {
                 var measurements = await _databaseService.GetAllMeasurementsAsync();
                 var lastMeasurement = measurements
@@ -336,7 +465,7 @@ public class EquipmentManagementViewModel : ViewModelBase
                     LastActionDate = null;
                 }
             }
-            else // Трубопроводы - последний ремонт или проверка
+            else
             {
                 var repairs = await _databaseService.GetRepairsAsync();
                 var lastRepair = repairs

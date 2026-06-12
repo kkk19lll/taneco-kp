@@ -1,4 +1,3 @@
-// Views/EquipmentManagementView.axaml.cs (без изменений, но для полноты)
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -24,10 +23,10 @@ public partial class EquipmentManagementView : UserControl
     private async void SearchBox_OnTextChanged(object sender, TextChangedEventArgs e)
     {
         if (_viewModel == null) return;
-        
+
         var textBox = sender as TextBox;
         if (textBox == null) return;
-        
+
         if (string.IsNullOrWhiteSpace(textBox.Text))
         {
             await _viewModel.LoadEquipmentAsync();

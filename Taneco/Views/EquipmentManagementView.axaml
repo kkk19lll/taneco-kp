@@ -30,7 +30,15 @@
 
             <!--  Левая панель  -->
             <Border Grid.Column="0" Background="{DynamicResource RegionColor}">
-                <Grid RowDefinitions="Auto,*,Auto,Auto">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
                     <!--  Поиск  -->
                     <TextBox
                         Grid.Row="0"
@@ -48,8 +56,6 @@
                                 <DataTemplate>
                                     <Border Margin="0,2" Padding="8">
                                         <StackPanel>
-                                            <!--  Для датчиков: модель + точка контроля  -->
-                                            <!--  Для трубопроводов: название + протяженность  -->
                                             <TextBlock FontWeight="Bold" Text="{Binding DisplayName}" />
                                             <TextBlock
                                                 FontSize="11"
@@ -62,7 +68,7 @@
                         </ListBox>
                     </ScrollViewer>
 
-                    <!--  Кнопка обновить данные  -->
+                    <!--  Кнопка Обновить данные  -->
                     <Button
                         Grid.Row="2"
                         Margin="10,5,10,5"
@@ -70,9 +76,17 @@
                         Command="{Binding RefreshDataCommand}"
                         Content="⟳ Обновить данные" />
 
+                    <!--  Кнопка Создать датчик/трубопровод  -->
+                    <Button
+                        Grid.Row="3"
+                        Margin="10,5,10,5"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding CreateEquipmentCommand}"
+                        Content="Создать датчик/трубопровод" />
+
                     <!--  Счетчик  -->
                     <TextBlock
-                        Grid.Row="3"
+                        Grid.Row="4"
                         Margin="10,0,10,10"
                         HorizontalAlignment="Center"
                         FontSize="12"
@@ -105,7 +119,6 @@
                                 Background="{DynamicResource RegionColor}"
                                 CornerRadius="8">
                                 <StackPanel Spacing="10">
-                                    <!--  Для датчиков: модель + точка контроля  -->
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="Bold"
@@ -119,14 +132,12 @@
                                         <TextBlock Grid.Column="1" Text="{Binding DetailValue2}" />
                                     </Grid>
 
-                                    <!--  Разделитель для датчиков  -->
                                     <Border
                                         Height="1"
                                         Margin="0,5"
                                         Background="{DynamicResource ThemeControlHighlightMidBrush}"
                                         IsVisible="{Binding IsSensorSelected}" />
 
-                                    <!--  Доп. информация для трубопроводов  -->
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="Bold"
@@ -145,7 +156,6 @@
                                         <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.Diameter, StringFormat={}{0} мм}" />
                                     </Grid>
 
-                                    <!--  Доп. информация для датчиков  -->
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="Bold"
@@ -168,13 +178,11 @@
                                         <TextBlock Grid.Column="1" Text="{Binding SelectedEquipmentDetails.InstallationLocation}" />
                                     </Grid>
 
-                                    <!--  Разделитель  -->
                                     <Border
                                         Height="1"
                                         Margin="0,5"
                                         Background="{DynamicResource ThemeControlHighlightMidBrush}" />
 
-                                    <!--  Последнее действие  -->
                                     <TextBlock
                                         FontSize="14"
                                         FontWeight="Bold"
@@ -191,6 +199,13 @@
                                         <TextBlock FontWeight="Bold" Text="Дата: " />
                                         <TextBlock Grid.Column="1" Text="{Binding LastActionDate, StringFormat={}{0:dd.MM.yyyy HH:mm}}" />
                                     </Grid>
+
+                                    <!--  Кнопка Редактировать (всегда видима, но может быть неактивна)  -->
+                                    <Button
+                                        Margin="0,15,0,0"
+                                        HorizontalAlignment="Stretch"
+                                        Command="{Binding EditEquipmentCommand}"
+                                        Content="✏️ Редактировать" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>

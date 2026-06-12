@@ -19,17 +19,21 @@ public partial class App : Application
         {
             var loginViewModel = new LoginViewModel();
             var loginWindow = new LoginWindow { DataContext = loginViewModel };
-            
+
             loginViewModel.OnLoginSuccess += (user) =>
             {
-                if (user != null)  // Добавляем проверку на null
+                if (user != null)
                 {
-                    var mainWindow = new MainWindow { DataContext = new MainWindowViewModel(user) };
+                    // Создаем главное окно
+                    var mainWindow = new MainWindow();
+                    // Передаем в MainWindowViewModel текущего пользователя и само окно
+                    var mainViewModel = new MainWindowViewModel(user, mainWindow);
+                    mainWindow.DataContext = mainViewModel;
                     mainWindow.Show();
                     loginWindow.Close();
                 }
             };
-            
+
             desktop.MainWindow = loginWindow;
         }
 

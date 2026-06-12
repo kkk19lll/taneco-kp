@@ -2,6 +2,7 @@ using System;
 using System.Windows.Input;
 using Taneco.Models;
 using Taneco.Views;
+using Avalonia.Controls;
 
 namespace Taneco.ViewModels;
 
@@ -10,10 +11,12 @@ public class MainWindowViewModel : ViewModelBase
     private object? _currentView;
     private string _currentTitle = string.Empty;
     private User? _currentUser;
+    private Window? _parentWindow;
 
-    public MainWindowViewModel(User user)
+    public MainWindowViewModel(User user, Window parentWindow)
     {
         CurrentUser = user;
+        _parentWindow = parentWindow;
 
         ShowMonitoringCommand = new RelayCommand(_ => ShowMonitoring());
         ShowEquipmentsCommand = new RelayCommand(_ => ShowEquipments());
@@ -44,7 +47,7 @@ public class MainWindowViewModel : ViewModelBase
                 ShowMonitoring();
                 break;
             case "Инженер_КИПиА":
-                ShowEquipments();
+                ShowEquipmentManagement();
                 break;
             case "Инспектор":
                 ShowProblems();
@@ -175,8 +178,14 @@ public class MainWindowViewModel : ViewModelBase
 
     private void ShowEquipmentManagement()
     {
+        if (_parentWindow == null)
+        {
+            Console.WriteLine("Parent window is null");
+            return;
+        }
+
         var view = new EquipmentManagementView();
-        var viewModel = new EquipmentManagementViewModel();
+        var viewModel = new EquipmentManagementViewModel(_parentWindow);
         viewModel.CurrentUser = CurrentUser;
         view.DataContext = viewModel;
         CurrentView = view;

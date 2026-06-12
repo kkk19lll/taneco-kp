@@ -1,0 +1,147 @@
+<Window
+    x:Class="Taneco.Views.EquipmentEditWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:Taneco.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="clr-namespace:Taneco.ViewModels"
+    Title="{Binding WindowTitle}"
+    Width="550"
+    Height="750"
+    MinWidth="500"
+    MinHeight="650"
+    x:DataType="viewModels:EquipmentEditViewModel"
+    CanResize="True"
+    WindowStartupLocation="CenterOwner"
+    mc:Ignorable="d">
+
+    <Design.DataContext>
+        <viewModels:EquipmentEditViewModel />
+    </Design.DataContext>
+
+    <Window.Resources>
+        <converters:DateMaskConverter x:Key="DateMaskConverter" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource RegionColor}">
+            <Grid>
+                <TextBlock
+                    Margin="15,10"
+                    VerticalAlignment="Center"
+                    FontSize="16"
+                    FontWeight="Bold"
+                    Text="{Binding WindowTitle}" />
+                <!-- <Button
+                    Width="30"
+                    Height="30"
+                    Margin="0,0,10,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Command="{Binding CancelCommand}"
+                    Content="✕" /> -->
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20" Spacing="15">
+                <!--  Выбор типа оборудования (только при создании)  -->
+                <ComboBox
+                    Margin="0,5"
+                    IsVisible="{Binding IsCreateMode}"
+                    ItemsSource="{Binding EquipmentTypes}"
+                    SelectedItem="{Binding SelectedEquipmentType}" />
+
+                <!--  Общее поле для наименования  -->
+                <TextBox
+                    Margin="0,5"
+                    Text="{Binding FormName}"
+                    Watermark="Наименование *" />
+
+                <!--  Поля для датчика  -->
+                <Border IsVisible="{Binding ShowSensorFields}">
+                    <StackPanel Spacing="10">
+                        <TextBox Text="{Binding FormModel}" Watermark="Модель *" />
+                        <TextBox Text="{Binding FormManufacturer}" Watermark="Производитель *" />
+                        <TextBox Text="{Binding FormManufacturerCountry}" Watermark="Страна производителя" />
+
+                        <ComboBox ItemsSource="{Binding SensorTypes}" SelectedItem="{Binding FormSensorType}" />
+
+                        <ComboBox ItemsSource="{Binding MeasurementTypes}" SelectedItem="{Binding FormMeasurementType}" />
+
+                        <ComboBox ItemsSource="{Binding Units}" SelectedItem="{Binding FormUnit}" />
+
+                        <!--  Поля для мин/макс значений  -->
+                        <Grid Margin="0,5" ColumnDefinitions="*, *">
+                            <TextBox
+                                Grid.Column="0"
+                                Margin="0,0,5,0"
+                                Text="{Binding FormMinValue}"
+                                Watermark="Мин. значение *" />
+                            <TextBox
+                                Grid.Column="1"
+                                Margin="5,0,0,0"
+                                Text="{Binding FormMaxValue}"
+                                Watermark="Макс. значение *" />
+                        </Grid>
+
+                        <TextBox Text="{Binding FormControlPoint}" Watermark="Точка контроля" />
+
+                        <ComboBox ItemsSource="{Binding PipelinesForDropdown}" SelectedItem="{Binding FormPipelineName}" />
+
+                        <TextBox Text="{Binding FormLocation}" Watermark="Местоположение" />
+                        <TextBox Text="{Binding FormProductionYear}" Watermark="Год выпуска" />
+                    </StackPanel>
+                </Border>
+
+                <!--  Поля для трубопровода  -->
+                <Border IsVisible="{Binding ShowPipelineFields}">
+                    <StackPanel Spacing="10">
+                        <!--  ComboBox для выбора материала вместо TextBox  -->
+                        <ComboBox
+                            ItemsSource="{Binding MaterialsForDropdown}"
+                            SelectedItem="{Binding FormMaterial}"
+                            PlaceholderText="Выберите материал *" />
+
+                        <TextBox Text="{Binding FormLength}" Watermark="Протяженность (м) *" />
+                        <TextBox Text="{Binding FormDiameter}" Watermark="Диаметр (мм) *" />
+
+                        <!--  TextBox для даты с маской  -->
+                        <TextBox Text="{Binding FormInstallationDateString}" Watermark="Дата установки (ДД.ММ.ГГГГ)" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock
+                    FontSize="11"
+                    Opacity="0.7"
+                    Text="* - обязательные поля" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Background="{DynamicResource RegionColor}">
+            <StackPanel
+                Margin="10"
+                HorizontalAlignment="Right"
+                Orientation="Horizontal"
+                Spacing="10">
+                <Button
+                    Width="100"
+                    Command="{Binding CancelCommand}"
+                    Content="Отмена" />
+                <Button
+                    Width="100"
+                    Command="{Binding SaveCommand}"
+                    Content="{Binding ModalButtonText}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
