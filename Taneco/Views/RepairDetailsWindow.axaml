@@ -1,72 +1,285 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:Taneco.ViewModels"
-        x:Class="Taneco.Views.RepairDetailsWindow"
-        x:DataType="vm:RepairDetailsViewModel"
-        Title="Детали ремонта"
-        Width="550" Height="600"
-        WindowStartupLocation="CenterOwner"
-        CanResize="False">
-    <Grid RowDefinitions="Auto,*,Auto" Margin="15">
-        <Border Grid.Row="0" Classes="card" Margin="0,0,0,15">
+<Window
+    x:Class="Taneco.Views.RepairDetailsWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:Taneco.Converters"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    Title="Детали ремонта"
+    Width="600"
+    Height="700"
+    MinWidth="500"
+    MinHeight="600"
+    x:DataType="vm:RepairDetailsViewModel"
+    CanResize="True"
+    WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:NotNullToBoolConverter x:Key="NotNullToBoolConverter" />
+        <converters:StringToBoolConverter x:Key="StringToBoolConverter" />
+    </Window.Resources>
+
+    <Grid Margin="15" RowDefinitions="Auto,*,Auto">
+        <!--  Шапка с информацией о ремонте  -->
+        <Border
+            Grid.Row="0"
+            Margin="0,0,0,15"
+            Classes="card">
             <StackPanel>
-                <TextBlock Text="Информация о ремонте" Classes="h3" Margin="0,0,0,10"/>
-                <TextBlock Text="{Binding Repair.ProblemDescription}" FontWeight="Bold" FontSize="14"
-                           Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                <Grid ColumnDefinitions="Auto,Auto" Margin="0,10,0,0">
-                    <TextBlock Text="Бригада:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                    <TextBlock Text="{Binding Repair.TeamName}" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"/>
+                <TextBlock
+                    Margin="0,0,0,10"
+                    Classes="h3"
+                    Text="ИНФОРМАЦИЯ О РЕМОНТЕ" />
+
+                <TextBlock
+                    FontSize="14"
+                    FontWeight="Bold"
+                    Foreground="{StaticResource TextPrimaryBrush}"
+                    Text="{Binding Repair.ProblemDescription}"
+                    TextWrapping="Wrap" />
+
+                <TextBlock
+                    Margin="0,5,0,0"
+                    FontSize="12"
+                    Foreground="{StaticResource TextDarkBrush}"
+                    Text="{Binding Repair.ProblemType}" />
+
+                <Grid
+                    Margin="0,15,0,0"
+                    ColumnDefinitions="Auto,*,Auto,*"
+                    RowDefinitions="Auto,Auto,Auto">
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Оборудование:" />
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Margin="5,0,0,0"
+                        FontSize="13"
+                        FontWeight="Bold"
+                        Text="{Binding Repair.EquipmentName}" />
+
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="2"
+                        Margin="15,0,0,0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Бригада:" />
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="3"
+                        Margin="5,0,0,0"
+                        FontSize="13"
+                        FontWeight="Bold"
+                        Text="{Binding Repair.TeamName}" />
+
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Margin="0,10,0,0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Бюджет:" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        Margin="5,10,0,0"
+                        FontSize="13"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource SuccessBrush}"
+                        Text="{Binding Repair.Budget}" />
+
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="2"
+                        Margin="15,10,0,0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Дата начала:" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="3"
+                        Margin="5,10,0,0"
+                        FontSize="13"
+                        Text="{Binding Repair.StartDate, StringFormat='dd.MM.yyyy'}" />
+
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Margin="0,10,0,0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Дата окончания:" />
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="1"
+                        Margin="5,10,0,0"
+                        FontSize="13"
+                        Text="{Binding Repair.EndDate, StringFormat='dd.MM.yyyy'}" />
+
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="2"
+                        Margin="15,10,0,0"
+                        FontSize="12"
+                        Foreground="{StaticResource TextMutedBrush}"
+                        Text="Кто назначил:" />
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="3"
+                        Margin="5,10,0,0"
+                        FontSize="13"
+                        Text="{Binding Repair.AssignedBy}" />
                 </Grid>
-                <Grid ColumnDefinitions="Auto,Auto" Margin="0,5,0,0">
-                    <TextBlock Text="Бюджет:" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
-                    <TextBlock Text="{Binding Repair.Budget, StringFormat=\{0:C\}}" FontSize="13" FontWeight="Bold"
-                               Foreground="{StaticResource SuccessBrush}" Margin="10,0,0,0"/>
-                </Grid>
-                <TextBlock Text="{Binding Repair.StartDate, StringFormat=dd.MM.yyyy}" FontSize="11"
-                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
-                <TextBlock Text="{Binding Repair.EndDate, StringFormat=dd.MM.yyyy}" FontSize="11"
-                           Foreground="{StaticResource TextMutedBrush}" Margin="0,5,0,0"/>
-                <Border Background="{Binding Repair.StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,10,0,0"
-                        HorizontalAlignment="Left">
-                    <TextBlock Text="{Binding Repair.Status}" FontSize="10" Foreground="White"/>
+
+                <Border
+                    Margin="0,15,0,0"
+                    Padding="8,4"
+                    HorizontalAlignment="Left"
+                    Background="{Binding Repair.StatusColor}"
+                    CornerRadius="10">
+                    <TextBlock
+                        FontSize="11"
+                        FontWeight="Bold"
+                        Foreground="White"
+                        Text="{Binding Repair.Status}" />
                 </Border>
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1" Classes="card" Margin="0,0,0,15" IsVisible="{Binding CanManage}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="Управление ремонтом" Classes="h3" Margin="0,0,0,10"/>
+        <!--  Секция управления ремонтом  -->
+        <Border
+            Grid.Row="1"
+            Margin="0,0,0,15"
+            Classes="card"
+            IsVisible="{Binding CanManage}">
+            <ScrollViewer>
+                <StackPanel Spacing="15">
+                    <TextBlock
+                        Margin="0,0,0,10"
+                        Classes="h3"
+                        Text="УПРАВЛЕНИЕ РЕМОНТОМ" />
 
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="Бюджет:" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding EditBudget}" Width="150"/>
-                    <Button Command="{Binding SaveBudgetCommand}" Background="{StaticResource SuccessBrush}"
-                            Padding="15,8">Сохранить</Button>
-                </StackPanel>
+                    <!--  Установка бюджета  -->
+                    <Border Classes="inner-card">
+                        <StackPanel>
+                            <TextBlock
+                                Margin="0,0,0,8"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Text="Установка бюджета" />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBox
+                                    Width="180"
+                                    Text="{Binding EditBudget}"
+                                    Watermark="Сумма в рублях" />
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource SuccessBrush}"
+                                    Command="{Binding SaveBudgetCommand}">
+                                    Сохранить бюджет
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding CanAssignTeam}">
-                    <TextBlock Text="Назначить бригаду:" VerticalAlignment="Center"/>
-                    <ComboBox ItemsSource="{Binding RepairTeams}"
-                              SelectedItem="{Binding SelectedTeam}"
-                              DisplayMemberBinding="{Binding Name}"
-                              Width="180"/>
-                    <Button Command="{Binding AssignTeamCommand}" Background="{StaticResource WarningBrush}"
-                            Padding="15,8">Назначить</Button>
-                </StackPanel>
+                    <!--  Назначение бригады (только для статуса "Запланирован")  -->
+                    <Border Classes="inner-card" IsVisible="{Binding CanAssignTeam}">
+                        <StackPanel>
+                            <TextBlock
+                                Margin="0,0,0,8"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Text="Назначение бригады" />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ComboBox
+                                    Width="220"
+                                    DisplayMemberBinding="{Binding Name}"
+                                    ItemsSource="{Binding RepairTeams}"
+                                    SelectedItem="{Binding SelectedTeam}" />
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource WarningBrush}"
+                                    Command="{Binding AssignTeamCommand}">
+                                    Назначить
+                                </Button>
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource InfoBrush}"
+                                    Command="{Binding DiagnoseTeamCommand}">
+                                    Диагностика
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="Статус:" VerticalAlignment="Center"/>
-                    <ComboBox ItemsSource="{Binding AvailableStatuses}"
-                              SelectedItem="{Binding SelectedStatus}"
-                              Width="160"/>
-                    <Button Command="{Binding UpdateStatusCommand}" Background="{StaticResource InfoBrush}"
-                            Padding="15,8">Обновить статус</Button>
+                    <!--  Изменение статуса  -->
+                    <Border Classes="inner-card" IsVisible="{Binding CanUpdateStatus}">
+                        <StackPanel>
+                            <TextBlock
+                                Margin="0,0,0,8"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Text="Изменение статуса" />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ComboBox
+                                    Width="200"
+                                    ItemsSource="{Binding AvailableStatuses}"
+                                    SelectedItem="{Binding SelectedStatus}" />
+                                <Button
+                                    Padding="15,8"
+                                    Background="{StaticResource InfoBrush}"
+                                    Command="{Binding UpdateStatusCommand}">
+                                    Изменить статус
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!--  Результаты проверки  -->
+                    <Border Classes="inner-card" IsVisible="{Binding Repair.InspectionDescription, Converter={StaticResource StringToBoolConverter}}">
+                        <StackPanel>
+                            <TextBlock
+                                Margin="0,0,0,8"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Text="РЕЗУЛЬТАТЫ ПРОВЕРКИ" />
+                            <TextBlock
+                                FontSize="11"
+                                Text="{Binding Repair.InspectionDescription}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-            </StackPanel>
+            </ScrollViewer>
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
-            <Button Command="{Binding CloseCommand}" Background="{StaticResource TextMutedBrush}" Padding="20,8">Закрыть</Button>
+        <!--  Кнопки действий  -->
+        <StackPanel
+            Grid.Row="2"
+            Margin="0,15,0,0"
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Spacing="15">
+            <Button
+                Padding="20,8"
+                Background="{StaticResource InfoBrush}"
+                Command="{Binding GenerateReportCommand}"
+                IsVisible="{Binding IsRepairCompleted}">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="Сформировать отчет" />
+                </StackPanel>
+            </Button>
+            <Button
+                Padding="20,8"
+                Background="{StaticResource TextMutedBrush}"
+                Command="{Binding CloseCommand}">
+                Закрыть
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

@@ -1,55 +1,170 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Taneco.ViewModels"
-             xmlns:models="clr-namespace:Taneco.Models"
-             x:Class="Taneco.Views.RepairsView"
-             x:DataType="vm:RepairsViewModel"
-             x:CompileBindings="True">
-    <ScrollViewer>
-        <StackPanel Margin="15">
-            <TextBlock Text="Управление ремонтами" Classes="h1" Margin="0,0,0,15"/>
+<UserControl
+    x:Class="Taneco.Views.RepairsView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="clr-namespace:Taneco.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="clr-namespace:Taneco.Models"
+    xmlns:vm="clr-namespace:Taneco.ViewModels"
+    d:DesignHeight="600"
+    d:DesignWidth="800"
+    x:DataType="vm:RepairsViewModel"
+    mc:Ignorable="d">
 
-            <Border Classes="card" Margin="0,0,0,15">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                    <Button Command="{Binding LoadCommand}" Padding="15,8">Обновить</Button>
-                    <Button Command="{Binding CreateReportCommand}"
-                            IsVisible="{Binding CanCreateReport}"
-                            Background="{StaticResource InfoBrush}"
-                            Padding="15,8">Составить отчёт</Button>
-                    <TextBlock Text="Статус:" VerticalAlignment="Center" Margin="20,0,5,0"/>
-                    <ComboBox ItemsSource="{Binding StatusFilters}"
-                              SelectedItem="{Binding SelectedStatusFilter}"
-                              Width="140"/>
+    <UserControl.Resources>
+        <conv:DateMaskConverter x:Key="DateMaskConverter" />
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel Margin="20">
+            
+            <!-- Заголовок -->
+            <TextBlock
+                Margin="0,0,0,20"
+                FontSize="28"
+                FontWeight="SemiBold"
+                Text="Управление ремонтами" />
+
+            <!-- Панель фильтров -->
+            <Border Margin="0,0,0,20" 
+                    Background="{DynamicResource ThemeBackgroundBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8" 
+                    Padding="15">
+                <StackPanel Spacing="15">
+                    
+                    <!-- Верхняя строка: Обновить и Статус -->
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                        <Button Grid.Column="0" Padding="20,10" Command="{Binding LoadCommand}">
+                            <TextBlock Text="Обновить" />
+                        </Button>
+                        
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <TextBlock Text="Статус:" VerticalAlignment="Center" />
+                            <ComboBox
+                                Width="160"
+                                ItemsSource="{Binding StatusFilters}"
+                                SelectedItem="{Binding SelectedStatusFilter}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator />
+
+                    <!-- Нижняя строка: Поиск и Дата -->
+                    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto">
+                        <TextBlock Grid.Column="0" Text="Поиск:" VerticalAlignment="Center" />
+                        <TextBox
+                            Grid.Column="1"
+                            Width="240"
+                            Margin="10,0,15,0"
+                            Text="{Binding SearchText, Mode=TwoWay}"
+                            Watermark="По описанию, бригаде, оборудованию..." />
+                        <Button Grid.Column="2" Padding="12,8" Command="{Binding ClearSearchCommand}">
+                            <TextBlock Text="Очистить" />
+                        </Button>
+
+                        <TextBlock Grid.Column="3" Text="Дата:" Margin="20,0,10,0" VerticalAlignment="Center" />
+                        <TextBox
+                            Grid.Column="4"
+                            Width="130"
+                            MaxLength="10"
+                            Text="{Binding SelectedDateString, Mode=TwoWay}"
+                            Watermark="ДД.ММ.ГГГГ" />
+                        <Button
+                            Grid.Column="5"
+                            Padding="12,8"
+                            Margin="10,0,0,0"
+                            Command="{Binding ClearDateCommand}"
+                            IsVisible="{Binding HasSelectedDate}">
+                            <TextBlock Text="Сбросить" />
+                        </Button>
+                    </Grid>
+                    
                 </StackPanel>
             </Border>
 
+            <!-- Список ремонтов -->
             <ItemsControl ItemsSource="{Binding FilteredRepairs}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:CompileBindings="False">
-                        <Border Classes="card" Margin="0,0,0,8">
-                            <Button Command="{Binding $parent[UserControl].DataContext.RepairClickCommand}"
-                                    CommandParameter="{Binding}"
-                                    Background="Transparent"
-                                    Padding="0">
+                    <DataTemplate x:DataType="models:Repair">
+                        <Border Margin="0,0,0,10" 
+                                Background="{DynamicResource ThemeBackgroundBrush}"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            
+                            <Button Padding="16,14" 
+                                    Background="Transparent" 
+                                    HorizontalAlignment="Stretch" 
+                                    HorizontalContentAlignment="Stretch"
+                                    Click="OnRepairButtonClick" 
+                                    Tag="{Binding}">
+                                
+                                <!-- Эффект наведения с поддержкой темы -->
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover">
+                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}" />
+                                    </Style>
+                                </Button.Styles>
+                                
                                 <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Border Grid.Column="0" Background="{Binding StatusColor}" CornerRadius="5"
-                                            Width="4" Height="40" Margin="0,0,10,0"/>
+                                    
+                                    <!-- Цветовой индикатор статуса -->
+                                    <Border
+                                        Grid.Column="0"
+                                        Width="4"
+                                        Height="48"
+                                        Margin="0,0,16,0"
+                                        Background="{Binding StatusColor}"
+                                        CornerRadius="3" />
+                                    
+                                    <!-- Информация о ремонте -->
                                     <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding ProblemDescription}" FontWeight="Bold"
-                                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"
-                                                   TextWrapping="Wrap" MaxHeight="40"/>
-                                        <TextBlock Text="{Binding TeamName}" FontSize="11"
-                                                   Foreground="{StaticResource TextDarkBrush}"/>
-                                        <TextBlock Text="{Binding Budget, StringFormat='Бюджет: {0:C}'}" FontSize="11"
-                                                   Foreground="{StaticResource TextMutedBrush}"/>
+                                        <TextBlock
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding ProblemDescription}"
+                                            TextWrapping="Wrap" />
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="15" Margin="0,5,0,0">
+                                            <TextBlock
+                                                FontSize="12"
+                                                Text="{Binding TeamName}" />
+                                            
+                                            <TextBlock
+                                                FontSize="12"
+                                                Text="{Binding Budget}" />
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0">
-                                        <TextBlock Text="{Binding StartDate, StringFormat='dd.MM.yyyy'}" FontSize="11"
-                                                   Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
-                                        <Border Background="{Binding StatusColor}" CornerRadius="10" Padding="6,2" Margin="0,5,0,0">
-                                            <TextBlock Text="{Binding Status}" FontSize="10" Foreground="White"/>
+                                    
+                                    <!-- Дата и статус -->
+                                    <StackPanel
+                                        Grid.Column="2"
+                                        Margin="15,0,0,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Spacing="8">
+                                        
+                                        <TextBlock
+                                            HorizontalAlignment="Right"
+                                            FontSize="12"
+                                            Text="{Binding StartDate, StringFormat='dd.MM.yyyy'}" />
+                                        
+                                        <Border
+                                            Padding="10,4"
+                                            Background="{Binding StatusColor}"
+                                            CornerRadius="12"
+                                            HorizontalAlignment="Right">
+                                            <TextBlock
+                                                FontSize="11"
+                                                FontWeight="Medium"
+                                                Foreground="White"
+                                                Text="{Binding Status}" />
                                         </Border>
                                     </StackPanel>
+                                    
                                 </Grid>
                             </Button>
                         </Border>
@@ -57,8 +172,18 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock Text="{Binding FilteredRepairs.Count, StringFormat='Всего ремонтов: {0}'}"
-                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,10,0,0"/>
+            <!-- Счетчик записей -->
+            <Border Margin="0,15,0,0" Padding="10" 
+                    Background="{DynamicResource ThemeBackgroundBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <TextBlock
+                    FontSize="12"
+                    Text="{Binding FilteredRepairs.Count, StringFormat='Показано: {0} записей'}"
+                    HorizontalAlignment="Center" />
+            </Border>
+            
         </StackPanel>
     </ScrollViewer>
 </UserControl>

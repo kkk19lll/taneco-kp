@@ -1249,6 +1249,599 @@ public class DatabaseService
         }
     }
 
+    // ==================== НОВЫЕ МЕТОДЫ ДЛЯ НАЧАЛЬНИКА РЕМОНТНОЙ СЛУЖБЫ ====================
+
+    public async Task<ObservableCollection<Repair>> GetRepairsWithDetailsAsync()
+    {
+        var repairs = new ObservableCollection<Repair>();
+        const string query = @"
+            SELECT 
+                r.Код_ремонта,
+                up.Код_уведом_проб,
+                up.Описание as Проблема,
+                COALESCE(b.Код_бриг, 0) as Код_бригады,
+                COALESCE(b.Наименование, 'Не назначена') as Бригада,
+                r.Дата_начала,
+                r.Дата_окончания,
+                COALESCE(r.Бюджет, 0) as Бюджет,
+                sr.Наименование as Статус,
+                COALESCE(p.Описание, '') as Проверка_описание,
+                COALESCE(s.Фамилия || ' ' || s.Имя, 'Не назначен') as Кто_назначил,
+                COALESCE(i.Фамилия || ' ' || i.Имя, 'Не указан') as Кто_проверил,
+                COALESCE(t.Наименование, 'Не указан') as Оборудование
+            FROM Ремонт r
+            JOIN Проверка p ON r.Код_проверки = p.Код_проверки
+            JOIN Уведомление_проблемы up ON p.Код_уведом_проб = up.Код_уведом_проб
+            JOIN Статус_ремонта sr ON r.Код_статуса_ремонта = sr.Код_статуса_ремонта
+            LEFT JOIN Бригада_сотрудник bs ON r.Код_бриг_сотр = bs.Код_бриг_сотр
+            LEFT JOIN Бригада b ON bs.Код_бриг = b.Код_бриг
+            LEFT JOIN Сотрудник s ON p.Код_сотр = s.Код_сотр
+            LEFT JOIN Замер z ON up.Код_замера = z.Код_замера
+            LEFT JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+            LEFT JOIN Датчик d ON dt.Код_датчика = d.Код_датчика
+            LEFT JOIN Сотрудник i ON d.Код_датчика = i.Код_сотр
+            LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+            ORDER BY r.Дата_начала DESC";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                repairs.Add(new Repair
+                {
+                    Id = reader.GetInt32(0),
+                    ProblemId = reader.GetInt32(1),
+                    ProblemDescription = reader.GetString(2),
+                    TeamId = reader.GetInt32(3),
+                    TeamName = reader.GetString(4),
+                    StartDate = reader.GetDateTime(5),
+                    EndDate = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                    Budget = reader.GetDecimal(7),
+                    Status = reader.GetString(8),
+                    InspectionDescription = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                    AssignedBy = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                    InspectedBy = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    EquipmentName = reader.IsDBNull(12) ? "" : reader.GetString(12)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetRepairsWithDetailsAsync error: {ex.Message}");
+        }
+        return repairs;
+    }
+
+    public async Task<RepairFullDetails?> GetRepairFullDetailsAsync(int repairId)
+    {
+        const string query = @"
+            SELECT 
+                r.Код_ремонта,
+                up.Код_уведом_проб,
+                up.Описание as Проблема,
+                COALESCE(b.Код_бриг, 0) as Код_бригады,
+                COALESCE(b.Наименование, 'Не назначена') as Бригада,
+                r.Дата_начала,
+                r.Дата_окончания,
+                COALESCE(r.Бюджет, 0) as Бюджет,
+                sr.Наименование as Статус,
+                COALESCE(p.Описание, '') as Проверка_описание,
+                COALESCE(s.Фамилия || ' ' || s.Имя, 'Не назначен') as Кто_назначил,
+                COALESCE(i.Фамилия || ' ' || i.Имя, 'Не указан') as Кто_проверил,
+                COALESCE(t.Наименование, 'Не указан') as Оборудование,
+                COALESCE(tp.Наименование, 'Не указан') as Тип_проблемы,
+                COALESCE(z.Текущее_значение, 0) as Значение_замера,
+                COALESCE(rd.Максимальное_значение, 0) as Пороговое_значение
+            FROM Ремонт r
+            JOIN Проверка p ON r.Код_проверки = p.Код_проверки
+            JOIN Уведомление_проблемы up ON p.Код_уведом_проб = up.Код_уведом_проб
+            JOIN Статус_ремонта sr ON r.Код_статуса_ремонта = sr.Код_статуса_ремонта
+            JOIN Тип_проблемы tp ON up.Код_типа_проблемы = tp.Код_типа_проблемы
+            LEFT JOIN Бригада_сотрудник bs ON r.Код_бриг_сотр = bs.Код_бриг_сотр
+            LEFT JOIN Бригада b ON bs.Код_бриг = b.Код_бриг
+            LEFT JOIN Сотрудник s ON p.Код_сотр = s.Код_сотр
+            LEFT JOIN Замер z ON up.Код_замера = z.Код_замера
+            LEFT JOIN Датчик_трубопровод dt ON z.Код_дат_труб = dt.Код_дат_труб
+            LEFT JOIN Датчик d ON dt.Код_датчика = d.Код_датчика
+            LEFT JOIN Сотрудник i ON d.Код_датчика = i.Код_сотр
+            LEFT JOIN Трубопровод t ON dt.Код_трубопровода = t.Код_трубопровода
+            LEFT JOIN Особенности_датчика od ON d.Код_особ_дат = od.Код_особ_дат
+            LEFT JOIN Работа_датчика rd ON od.Код_раб_дат = rd.Код_раб_дат
+            WHERE r.Код_ремонта = @repairId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@repairId", repairId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return new RepairFullDetails
+                {
+                    Id = reader.GetInt32(0),
+                    ProblemId = reader.GetInt32(1),
+                    ProblemDescription = reader.GetString(2),
+                    TeamId = reader.GetInt32(3),
+                    TeamName = reader.GetString(4),
+                    StartDate = reader.GetDateTime(5),
+                    EndDate = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                    Budget = reader.GetDecimal(7),
+                    Status = reader.GetString(8),
+                    InspectionDescription = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                    AssignedBy = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                    InspectedBy = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    EquipmentName = reader.IsDBNull(12) ? "" : reader.GetString(12),
+                    ProblemType = reader.IsDBNull(13) ? "" : reader.GetString(13),
+                    MeasuredValue = reader.IsDBNull(14) ? 0 : reader.GetDecimal(14),
+                    ThresholdValue = reader.IsDBNull(15) ? 0 : reader.GetDecimal(15)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetRepairFullDetailsAsync error: {ex.Message}");
+        }
+        return null;
+    }
+
+    public async Task<bool> UpdateRepairBudgetAsync(int repairId, decimal budget)
+    {
+        const string query = "UPDATE Ремонт SET Бюджет = @budget WHERE Код_ремонта = @repairId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@repairId", repairId);
+            cmd.Parameters.AddWithValue("@budget", budget);
+            return await cmd.ExecuteNonQueryAsync() > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> AssignRepairTeamAsync(int repairId, int teamId)
+    {
+        const string checkQuery = @"
+        SELECT Код_бриг_сотр FROM Бригада_сотрудник 
+        WHERE Код_бриг = @teamId LIMIT 1";
+
+        const string updateQuery = @"
+        UPDATE Ремонт
+        SET Код_бриг_сотр = @brigSotrId
+        WHERE Код_ремонта = @repairId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            // Сначала проверяем, существует ли запись Бригада_сотрудник
+            int? brigSotrId = null;
+            await using (var checkCmd = new NpgsqlCommand(checkQuery, conn))
+            {
+                checkCmd.Parameters.AddWithValue("@teamId", teamId);
+                var result = await checkCmd.ExecuteScalarAsync();
+                if (result != null && result != DBNull.Value)
+                {
+                    brigSotrId = Convert.ToInt32(result);
+                }
+            }
+
+            if (!brigSotrId.HasValue)
+            {
+                Console.WriteLine($"Не найдена запись в Бригада_сотрудник для бригады {teamId}");
+                return false;
+            }
+
+            // Обновляем ремонт
+            await using var updateCmd = new NpgsqlCommand(updateQuery, conn);
+            updateCmd.Parameters.AddWithValue("@brigSotrId", brigSotrId.Value);
+            updateCmd.Parameters.AddWithValue("@repairId", repairId);
+            int rowsAffected = await updateCmd.ExecuteNonQueryAsync();
+
+            Console.WriteLine($"AssignRepairTeamAsync: repairId={repairId}, teamId={teamId}, brigSotrId={brigSotrId}, rowsAffected={rowsAffected}");
+
+            return rowsAffected > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AssignRepairTeamAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateRepairStatusAsync(int repairId, string status)
+    {
+        int statusId = status switch
+        {
+            "Запланирован" => 2,
+            "В процессе" => 3,
+            "В процессе ремонта" => 3,
+            "Завершён" => 6,
+            "Завершен" => 6,
+            "Аварийная остановка" => 1,
+            "Подготовка к ремонту" => 2,
+            "Испытания после ремонта" => 4,
+            "Готов к запуску" => 5,
+            "Ожидает поставки материалов" => 7,
+            "Требуется проектная документация" => 8,
+            "На согласовании метода ремонта" => 9,
+            "Консервация оборудования" => 10,
+            "Расконсервация" => 11,
+            _ => 3
+        };
+
+        const string query = @"
+        UPDATE Ремонт
+        SET Код_статуса_ремонта = @statusId,
+            Дата_окончания = CASE WHEN @statusId = 6 THEN CURRENT_DATE ELSE NULL END
+        WHERE Код_ремонта = @repairId";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@repairId", repairId);
+            cmd.Parameters.AddWithValue("@statusId", statusId);
+            int result = await cmd.ExecuteNonQueryAsync();
+
+            if ((statusId == 6 || status == "Завершен" || status == "Завершён") && result > 0)
+            {
+                await CompleteRepairAndNotifyAsync(repairId);
+            }
+
+            return result > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task CompleteRepairAndNotifyAsync(int repairId)
+    {
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            // Получаем problemId для этого ремонта
+            const string getProblemQuery = @"
+                SELECT up.Код_уведом_проб
+                FROM Ремонт r
+                JOIN Проверка p ON r.Код_проверки = p.Код_проверки
+                JOIN Уведомление_проблемы up ON p.Код_уведом_проб = up.Код_уведом_проб
+                WHERE r.Код_ремонта = @repairId";
+
+            int problemId = 0;
+            await using (var cmd = new NpgsqlCommand(getProblemQuery, conn))
+            {
+                cmd.Parameters.AddWithValue("@repairId", repairId);
+                var result = await cmd.ExecuteScalarAsync();
+                if (result != null)
+                {
+                    problemId = Convert.ToInt32(result);
+                }
+            }
+
+            if (problemId > 0)
+            {
+                // Обновляем статус проблемы на "Завершена"
+                await UpdateProblemStatusAsync(problemId, "Завершена");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CompleteRepairAndNotifyAsync error: {ex.Message}");
+        }
+    }
+
+    public async Task<ObservableCollection<RepairTeam>> GetAvailableRepairTeamsAsync()
+    {
+        var teams = new ObservableCollection<RepairTeam>();
+        // Убираем условие WHERE Активен = true, так как такой колонки нет
+        const string query = @"
+        SELECT Код_бриг, Наименование, Специализация, Количество_рабочих 
+        FROM Бригада
+        ORDER BY Наименование";
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                teams.Add(new RepairTeam
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    Specialization = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    WorkerCount = reader.GetInt32(3)
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GetAvailableRepairTeamsAsync error: {ex.Message}");
+        }
+        return teams;
+    }
+
+    public async Task<bool> GenerateRepairReportAsync(int repairId, string savePath)
+    {
+        try
+        {
+            var repairDetails = await GetRepairFullDetailsAsync(repairId);
+            if (repairDetails == null)
+            {
+                Console.WriteLine($"Repair with ID {repairId} not found");
+                return false;
+            }
+
+            string directory = Path.GetDirectoryName(savePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await Task.Run(() => GenerateRepairPdf(repairDetails, savePath));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GenerateRepairReportAsync error: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void GenerateRepairPdf(RepairFullDetails repair, string filePath)
+    {
+        try
+        {
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(10));
+
+                    page.Header()
+                        .AlignCenter()
+                        .Column(col =>
+                        {
+                            col.Spacing(5);
+                            col.Item().Text("ОТЧЕТ ПО РЕМОНТУ").Bold().FontSize(18);
+                            col.Item().Text($"№{repair.Id} от {repair.StartDate:dd.MM.yyyy}").FontSize(14);
+                            col.Item().PaddingTop(10).LineHorizontal(1);
+                        });
+
+                    page.Content().Column(col =>
+                    {
+                        col.Spacing(15);
+
+                        // Основная информация
+                        col.Item().Column(infoCol =>
+                        {
+                            infoCol.Spacing(8);
+                            infoCol.Item().Text("ОСНОВНАЯ ИНФОРМАЦИЯ").Bold().FontSize(13);
+
+                            infoCol.Item().Text(text =>
+                            {
+                                text.Span("Статус: ").Bold();
+                                text.Span(repair.Status);
+                            });
+
+                            infoCol.Item().Text(text =>
+                            {
+                                text.Span("Бригада: ").Bold();
+                                text.Span(repair.TeamName);
+                            });
+
+                            infoCol.Item().Text(text =>
+                            {
+                                text.Span("Бюджет: ").Bold();
+                                text.Span($"{repair.Budget:N2} руб.");
+                            });
+
+                            if (repair.EndDate.HasValue)
+                            {
+                                infoCol.Item().Text(text =>
+                                {
+                                    text.Span("Сроки: ").Bold();
+                                    text.Span($"{repair.StartDate:dd.MM.yyyy} - {repair.EndDate.Value:dd.MM.yyyy}");
+                                });
+                            }
+                        });
+
+                        // Информация о проблеме
+                        col.Item().Column(probCol =>
+                        {
+                            probCol.Spacing(8);
+                            probCol.Item().Text("ИНФОРМАЦИЯ О ПРОБЛЕМЕ").Bold().FontSize(13);
+
+                            probCol.Item().Text(text =>
+                            {
+                                text.Span("Тип проблемы: ").Bold();
+                                text.Span(repair.ProblemType);
+                            });
+
+                            probCol.Item().Text(text =>
+                            {
+                                text.Span("Описание: ").Bold();
+                                text.Span(repair.ProblemDescription);
+                            });
+
+                            probCol.Item().Text(text =>
+                            {
+                                text.Span("Оборудование: ").Bold();
+                                text.Span(repair.EquipmentName);
+                            });
+
+                            probCol.Item().Text(text =>
+                            {
+                                text.Span("Кто назначил: ").Bold();
+                                text.Span(repair.AssignedBy);
+                            });
+
+                            probCol.Item().Text(text =>
+                            {
+                                text.Span("Кто проверил: ").Bold();
+                                text.Span(repair.InspectedBy);
+                            });
+                        });
+
+                        // Технические параметры
+                        col.Item().Column(techCol =>
+                        {
+                            techCol.Spacing(8);
+                            techCol.Item().Text("ТЕХНИЧЕСКИЕ ПАРАМЕТРЫ").Bold().FontSize(13);
+
+                            techCol.Item().Text(text =>
+                            {
+                                text.Span("Измеренное значение: ").Bold();
+                                text.Span($"{repair.MeasuredValue:F2}");
+                            });
+
+                            techCol.Item().Text(text =>
+                            {
+                                text.Span("Пороговое значение: ").Bold();
+                                text.Span($"{repair.ThresholdValue:F2}");
+                            });
+                        });
+
+                        // Проверка
+                        if (!string.IsNullOrEmpty(repair.InspectionDescription))
+                        {
+                            col.Item().Column(inspCol =>
+                            {
+                                inspCol.Spacing(8);
+                                inspCol.Item().Text("РЕЗУЛЬТАТЫ ПРОВЕРКИ").Bold().FontSize(13);
+                                inspCol.Item().Text(repair.InspectionDescription);
+                            });
+                        }
+
+                        // Решение
+                        col.Item().Column(solCol =>
+                        {
+                            solCol.Spacing(8);
+                            solCol.Item().Text("РЕШЕНИЕ").Bold().FontSize(13);
+                            solCol.Item().Text("Ремонт выполнен в соответствии с регламентом. Оборудование введено в эксплуатацию.");
+                        });
+                    });
+
+                    page.Footer()
+                        .AlignCenter()
+                        .Column(col =>
+                        {
+                            col.Spacing(5);
+                            col.Item().PaddingTop(10).LineHorizontal(1);
+                            col.Item().Text($"Дата формирования отчета: {DateTime.Now:dd.MM.yyyy HH:mm:ss}").FontSize(8);
+                            col.Item().Text("Система мониторинга трубопроводов").FontSize(8);
+                        });
+                });
+            });
+
+            document.GeneratePdf(filePath);
+            Console.WriteLine($"Report PDF generated: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GenerateRepairPdf error: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<ObservableCollection<string>> GetAvailableStatusesForRepairAsync(string currentStatus)
+    {
+        var statuses = new ObservableCollection<string>();
+
+        Console.WriteLine($"GetAvailableStatusesForRepairAsync called with currentStatus: '{currentStatus}'");
+
+        // Логика перехода статусов для ремонтов
+        // Приводим статус к единому формату для сравнения (убираем ё)
+        string normalizedStatus = currentStatus.Replace("ё", "е");
+
+        if (normalizedStatus == "Запланирован")
+        {
+            statuses.Add("В процессе");
+            statuses.Add("Завершен");
+            Console.WriteLine("Added statuses for Запланирован: В процессе, Завершен");
+        }
+        else if (normalizedStatus == "В процессе" || normalizedStatus == "В процессе ремонта")
+        {
+            statuses.Add("Завершен");
+            Console.WriteLine("Added statuses for В процессе/В процессе ремонта: Завершен");
+        }
+        else if (normalizedStatus == "Подготовка к ремонту")
+        {
+            statuses.Add("В процессе ремонта");
+            statuses.Add("Завершен");
+            Console.WriteLine("Added statuses for Подготовка к ремонту: В процессе ремонта, Завершен");
+        }
+        else if (normalizedStatus == "Испытания после ремонта")
+        {
+            statuses.Add("Готов к запуску");
+            Console.WriteLine("Added statuses for Испытания после ремонта: Готов к запуску");
+        }
+        else if (normalizedStatus == "Готов к запуску")
+        {
+            statuses.Add("Завершен");
+            Console.WriteLine("Added statuses for Готов к запуску: Завершен");
+        }
+        else if (normalizedStatus == "Завершен" || normalizedStatus == "Завершён")
+        {
+            // Завершённый ремонт нельзя изменить
+            Console.WriteLine("No statuses for Завершен (completed repair cannot be changed)");
+        }
+        else if (normalizedStatus == "Аварийная остановка")
+        {
+            statuses.Add("Подготовка к ремонту");
+            statuses.Add("В процессе ремонта");
+            Console.WriteLine("Added statuses for Аварийная остановка: Подготовка к ремонту, В процессе ремонта");
+        }
+        else if (normalizedStatus == "Ожидает поставки материалов")
+        {
+            statuses.Add("Подготовка к ремонту");
+            statuses.Add("В процессе ремонта");
+            Console.WriteLine("Added statuses for Ожидает поставки материалов: Подготовка к ремонту, В процессе ремонта");
+        }
+        else if (normalizedStatus == "Требуется проектная документация")
+        {
+            statuses.Add("Подготовка к ремонту");
+            Console.WriteLine("Added statuses for Требуется проектная документация: Подготовка к ремонту");
+        }
+        else if (normalizedStatus == "На согласовании метода ремонта")
+        {
+            statuses.Add("Подготовка к ремонту");
+            statuses.Add("В процессе ремонта");
+            Console.WriteLine("Added statuses for На согласовании метода ремонта: Подготовка к ремонту, В процессе ремонта");
+        }
+        else if (normalizedStatus == "Консервация оборудования")
+        {
+            statuses.Add("Расконсервация");
+            statuses.Add("Подготовка к ремонту");
+            Console.WriteLine("Added statuses for Консервация оборудования: Расконсервация, Подготовка к ремонту");
+        }
+        else
+        {
+            // Для других неизвестных статусов
+            statuses.Add("Запланирован");
+            statuses.Add("В процессе ремонта");
+            statuses.Add("Завершен");
+            Console.WriteLine("Added default statuses for unknown status");
+        }
+
+        Console.WriteLine($"Returning {statuses.Count} statuses");
+        return statuses;
+    }
+
     public async Task<ObservableCollection<Repair>> GetRepairsAsync()
     {
         var repairs = new ObservableCollection<Repair>();
@@ -1347,82 +1940,6 @@ public class DatabaseService
         {
         }
         return repairs;
-    }
-
-    public async Task<bool> UpdateRepairBudgetAsync(int repairId, decimal budget)
-    {
-        const string query = "UPDATE Ремонт SET Бюджет = @budget WHERE Код_ремонта = @repairId";
-
-        try
-        {
-            await using var conn = await GetConnectionAsync();
-            await using var cmd = new NpgsqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@repairId", repairId);
-            cmd.Parameters.AddWithValue("@budget", budget);
-            return await cmd.ExecuteNonQueryAsync() > 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public async Task<bool> AssignRepairTeamAsync(int repairId, int teamId)
-    {
-        const string query = @"
-            UPDATE Ремонт
-            SET Код_бриг_сотр = (
-                SELECT Код_бриг_сотр FROM Бригада_сотрудник WHERE Код_бриг = @teamId LIMIT 1
-            )
-            WHERE Код_ремонта = @repairId";
-
-        try
-        {
-            await using var conn = await GetConnectionAsync();
-            await using var cmd = new NpgsqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@repairId", repairId);
-            cmd.Parameters.AddWithValue("@teamId", teamId);
-            return await cmd.ExecuteNonQueryAsync() > 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public async Task<bool> UpdateRepairStatusAsync(int repairId, string status)
-    {
-        int statusId = status switch
-        {
-            "Аварийная остановка" => 1,
-            "Подготовка к ремонту" => 2,
-            "В процессе ремонта" => 3,
-            "Испытания после ремонта" => 4,
-            "Готов к запуску" => 5,
-            "Завершен" => 6,
-            "Ожидает поставки материалов" => 7,
-            "Требуется проектная документация" => 8,
-            "На согласовании метода ремонта" => 9,
-            "Консервация оборудования" => 10,
-            _ => 3
-        };
-
-        const string query = @"
-            CALL update_repair_status(@repairId, @statusId, NULL)";
-
-        try
-        {
-            await using var conn = await GetConnectionAsync();
-            await using var cmd = new NpgsqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@repairId", repairId);
-            cmd.Parameters.AddWithValue("@statusId", statusId);
-            await cmd.ExecuteNonQueryAsync();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     public async Task<ObservableCollection<Employee>> GetEmployeesAsync()
@@ -1981,7 +2498,6 @@ public class DatabaseService
 
             await using var conn = await GetConnectionAsync();
 
-            // Получаем или создаем производителя
             int manufacturerId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_производ FROM Производитель WHERE Наименование = @name", conn))
             {
@@ -2002,7 +2518,6 @@ public class DatabaseService
                 }
             }
 
-            // Получаем или создаем модель
             int modelId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_модели FROM Модель WHERE Наименование = @name", conn))
             {
@@ -2023,7 +2538,6 @@ public class DatabaseService
                 }
             }
 
-            // Получаем ID типа датчика
             int sensorTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_типа_дат FROM Тип_датчика WHERE Наименование = @name", conn))
             {
@@ -2032,7 +2546,6 @@ public class DatabaseService
                 sensorTypeId = result != null ? (int)result : 1;
             }
 
-            // Получаем ID типа измерения
             int measurementTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_измер_дат FROM Измерение_датчика WHERE Наименование = @name", conn))
             {
@@ -2041,7 +2554,6 @@ public class DatabaseService
                 measurementTypeId = result != null ? (int)result : 1;
             }
 
-            // Получаем ID единицы измерения
             int unitId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_ед_измер FROM Единица_измерения WHERE Наименование = @name", conn))
             {
@@ -2050,7 +2562,6 @@ public class DatabaseService
                 unitId = result != null ? (int)result : 1;
             }
 
-            // Получаем или создаем особенности измерения
             int measurementFeatureId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_особ_измер_дат FROM Особенности_измерения WHERE Код_измер_дат = @measurementTypeId AND Код_ед_измер = @unitId", conn))
             {
@@ -2073,7 +2584,6 @@ public class DatabaseService
                 }
             }
 
-            // Создаем работу датчика
             int workId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Работа_датчика (Код_раб_дат, Описание, Минимальное_значение, Максимальное_значение) VALUES ((SELECT COALESCE(MAX(Код_раб_дат), 0) + 1 FROM Работа_датчика), @description, @minValue, @maxValue) RETURNING Код_раб_дат", conn))
             {
@@ -2083,7 +2593,6 @@ public class DatabaseService
                 workId = (int)(await cmd.ExecuteScalarAsync() ?? 1);
             }
 
-            // Создаем особенности датчика
             int sensorFeatureId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Особенности_датчика (Код_особ_дат, Код_раб_дат, Код_типа_дат) VALUES ((SELECT COALESCE(MAX(Код_особ_дат), 0) + 1 FROM Особенности_датчика), @workId, @sensorTypeId) RETURNING Код_особ_дат", conn))
             {
@@ -2094,7 +2603,6 @@ public class DatabaseService
 
             int year = string.IsNullOrEmpty(productionYear) ? 0 : int.Parse(productionYear);
 
-            // Создаем датчик
             int sensorId;
             await using (var cmd = new NpgsqlCommand("INSERT INTO Датчик (Код_датчика, Код_модели, Код_особ_дат, Код_особ_измер_дат, Точка_контроля, Год_выпуска) VALUES ((SELECT COALESCE(MAX(Код_датчика), 0) + 1 FROM Датчик), @modelId, @sensorFeatureId, @measurementFeatureId, @controlPoint, @year) RETURNING Код_датчика", conn))
             {
@@ -2108,7 +2616,6 @@ public class DatabaseService
 
             Console.WriteLine($"Датчик создан с ID: {sensorId}");
 
-            // Создаем связь с трубопроводом, только если pipelineId > 0
             if (pipelineId > 0)
             {
                 string finalLocation = string.IsNullOrEmpty(location) ? "Не указано" : location;
@@ -2140,14 +2647,12 @@ public class DatabaseService
         }
     }
 
-    // ИСПРАВЛЕННЫЙ метод CreatePipelineAsync с проверками заполненных полей
     public async Task<bool> CreatePipelineAsync(string name, string material, string length, string diameter, DateTime installationDate)
     {
         try
         {
             Console.WriteLine($"CreatePipelineAsync started: name={name}, material={material}, length={length}, diameter={diameter}, date={installationDate}");
 
-            // Проверка обязательных полей
             if (string.IsNullOrWhiteSpace(name))
             {
                 Console.WriteLine("Ошибка: Наименование трубопровода не заполнено");
@@ -2172,7 +2677,6 @@ public class DatabaseService
                 return false;
             }
 
-            // Парсинг числовых значений
             if (!decimal.TryParse(length.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal parsedLength))
             {
                 Console.WriteLine($"Ошибка: Некорректное значение протяженности: '{length}'");
@@ -2197,7 +2701,6 @@ public class DatabaseService
                 return false;
             }
 
-            // Проверка даты
             if (installationDate == default || installationDate > DateTime.Today)
             {
                 Console.WriteLine($"Ошибка: Некорректная дата установки: {installationDate}");
@@ -2206,7 +2709,6 @@ public class DatabaseService
 
             await using var conn = await GetConnectionAsync();
 
-            // Получаем ID материала
             int materialId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_материала FROM Материал WHERE Наименование = @name", conn))
             {
@@ -2220,7 +2722,6 @@ public class DatabaseService
                 materialId = (int)result;
             }
 
-            // Получаем или создаем вид трубопровода
             int viewId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_вида_труб FROM Вид_трубопровода WHERE Код_материала = @materialId", conn))
             {
@@ -2229,7 +2730,6 @@ public class DatabaseService
                 if (result != null)
                 {
                     viewId = (int)result;
-                    // Обновляем существующую запись
                     await using (var updateCmd = new NpgsqlCommand("UPDATE Вид_трубопровода SET Протяженность = @length, Диаметр = @diameter WHERE Код_вида_труб = @viewId", conn))
                     {
                         updateCmd.Parameters.AddWithValue("@length", parsedLength);
@@ -2241,7 +2741,6 @@ public class DatabaseService
                 }
                 else
                 {
-                    // Создаем новый вид трубопровода
                     await using (var insertCmd = new NpgsqlCommand(@"
                         INSERT INTO Вид_трубопровода (Код_вида_труб, Код_материала, Протяженность, Диаметр) 
                         VALUES ((SELECT COALESCE(MAX(Код_вида_труб), 0) + 1 FROM Вид_трубопровода), @materialId, @length, @diameter) 
@@ -2256,7 +2755,6 @@ public class DatabaseService
                 }
             }
 
-            // Проверяем, существует ли трубопровод с таким именем
             await using (var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM Трубопровод WHERE Наименование = @name", conn))
             {
                 checkCmd.Parameters.AddWithValue("@name", name);
@@ -2268,7 +2766,6 @@ public class DatabaseService
                 }
             }
 
-            // Создаем трубопровод
             await using (var cmd = new NpgsqlCommand(@"
                 INSERT INTO Трубопровод (Код_трубопровода, Наименование, Дата_установки, Код_вида_труб) 
                 VALUES ((SELECT COALESCE(MAX(Код_трубопровода), 0) + 1 FROM Трубопровод), @name, @date, @viewId)", conn))
@@ -3215,7 +3712,6 @@ public class DatabaseService
 
             await using var conn = await GetConnectionAsync();
 
-            // Получаем или создаем производителя
             int manufacturerId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_производ FROM Производитель WHERE Наименование = @name", conn))
             {
@@ -3236,7 +3732,6 @@ public class DatabaseService
                 }
             }
 
-            // Получаем или создаем модель
             int modelId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_модели FROM Модель WHERE Наименование = @name", conn))
             {
@@ -3257,7 +3752,6 @@ public class DatabaseService
                 }
             }
 
-            // Получаем ID типа датчика
             int sensorTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_типа_дат FROM Тип_датчика WHERE Наименование = @name", conn))
             {
@@ -3271,7 +3765,6 @@ public class DatabaseService
                 sensorTypeId = (int)result;
             }
 
-            // Получаем ID типа измерения
             int measurementTypeId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_измер_дат FROM Измерение_датчика WHERE Наименование = @name", conn))
             {
@@ -3280,7 +3773,6 @@ public class DatabaseService
                 measurementTypeId = result != null ? (int)result : 1;
             }
 
-            // Получаем ID единицы измерения
             int unitId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_ед_измер FROM Единица_измерения WHERE Наименование = @name", conn))
             {
@@ -3289,7 +3781,6 @@ public class DatabaseService
                 unitId = result != null ? (int)result : 1;
             }
 
-            // Получаем или создаем особенности измерения
             int measurementFeatureId;
             await using (var cmd = new NpgsqlCommand("SELECT Код_особ_измер_дат FROM Особенности_измерения WHERE Код_измер_дат = @measurementTypeId AND Код_ед_измер = @unitId", conn))
             {
@@ -3312,7 +3803,6 @@ public class DatabaseService
                 }
             }
 
-            // Обновляем пороги датчика
             await using (var cmd = new NpgsqlCommand(@"
             UPDATE Работа_датчика 
             SET Минимальное_значение = @minValue, Максимальное_значение = @maxValue
@@ -3325,7 +3815,6 @@ public class DatabaseService
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Обновляем тип датчика в таблице Особенности_датчика
             await using (var cmd = new NpgsqlCommand(@"
             UPDATE Особенности_датчика 
             SET Код_типа_дат = @sensorTypeId
@@ -3337,7 +3826,6 @@ public class DatabaseService
                 Console.WriteLine($"Обновлен тип датчика: sensorTypeId={sensorTypeId}, rowsAffected={rowsAffected}");
             }
 
-            // Обновляем датчик
             int year = string.IsNullOrEmpty(productionYear) ? 0 : int.Parse(productionYear);
             await using (var cmd = new NpgsqlCommand(@"
             UPDATE Датчик 
@@ -3353,7 +3841,6 @@ public class DatabaseService
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Обновляем связь с трубопроводом
             string finalLocation = string.IsNullOrEmpty(location) ? "Не указано" : location;
 
             await using (var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM Датчик_трубопровод WHERE Код_датчика = @sensorId", conn))
@@ -3437,6 +3924,69 @@ public class DatabaseService
             Console.WriteLine($"UpdateSensorAsync error: {ex.Message}");
             Console.WriteLine($"StackTrace: {ex.StackTrace}");
             return false;
+        }
+    }
+
+    public async Task<string> DiagnoseTeamAssignmentAsync(int teamId)
+    {
+        var result = new System.Text.StringBuilder();
+
+        try
+        {
+            await using var conn = await GetConnectionAsync();
+
+            // Проверяем существование бригады
+            await using var teamCmd = new NpgsqlCommand("SELECT Код_бриг, Наименование FROM Бригада WHERE Код_бриг = @teamId", conn);
+            teamCmd.Parameters.AddWithValue("@teamId", teamId);
+            using var teamReader = await teamCmd.ExecuteReaderAsync();
+
+            if (await teamReader.ReadAsync())
+            {
+                result.AppendLine($"Бригада найдена: {teamReader.GetString(1)} (ID: {teamReader.GetInt32(0)})");
+            }
+            else
+            {
+                result.AppendLine($"Бригада с ID {teamId} не найдена в таблице Бригада");
+                return result.ToString();
+            }
+            await teamReader.CloseAsync();
+
+            // Проверяем связь с сотрудником
+            await using var linkCmd = new NpgsqlCommand(@"
+            SELECT bs.Код_бриг_сотр, bs.Код_сотр, s.Фамилия, s.Имя, s.Отчество
+            FROM Бригада_сотрудник bs
+            LEFT JOIN Сотрудник s ON bs.Код_сотр = s.Код_сотр
+            WHERE bs.Код_бриг = @teamId", conn);
+            linkCmd.Parameters.AddWithValue("@teamId", teamId);
+            using var linkReader = await linkCmd.ExecuteReaderAsync();
+
+            if (await linkReader.ReadAsync())
+            {
+                result.AppendLine($"Найдена связь бригады с сотрудником:");
+                result.AppendLine($"   - Код связи (Код_бриг_сотр): {linkReader.GetInt32(0)}");
+                result.AppendLine($"   - Код сотрудника: {linkReader.GetInt32(1)}");
+                string fullName = $"{linkReader.GetString(2)} {linkReader.GetString(3)} {linkReader.GetString(4)}".Trim();
+                result.AppendLine($"   - Сотрудник: {fullName}");
+            }
+            else
+            {
+                result.AppendLine("НЕ найдена связь бригады с сотрудником в таблице Бригада_сотрудник");
+                result.AppendLine("");
+                result.AppendLine("РЕШЕНИЕ: Добавьте запись в таблицу Бригада_сотрудник:");
+                result.AppendLine("");
+                result.AppendLine("```sql");
+                result.AppendLine($"INSERT INTO Бригада_сотрудник (Код_бриг_сотр, Код_бриг, Код_сотр)");
+                result.AppendLine($"SELECT COALESCE(MAX(Код_бриг_сотр), 0) + 1, {teamId},");
+                result.AppendLine($"       (SELECT Код_сотр FROM Сотрудник WHERE Активен = true LIMIT 1)");
+                result.AppendLine($"FROM Бригада_сотрудник;");
+                result.AppendLine("```");
+            }
+
+            return result.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"Ошибка диагностики: {ex.Message}";
         }
     }
 }
